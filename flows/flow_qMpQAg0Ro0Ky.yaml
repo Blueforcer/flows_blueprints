@@ -15,7 +15,7 @@ blueprint:
 
     ### Prerequisites
 
-    AWTRIX v0.72
+    AWTRIX v0.72 or higher
 
   domain: automation
   input:
