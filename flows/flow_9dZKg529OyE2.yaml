@@ -58,7 +58,7 @@ mode: queued
 
 variables:
   device_id: !input awtrix_3
-  aawtrix_3: "{{ iif( device_attr(device_id, 'name_by_user') != none, device_attr(device_id, 'name_by_user'), device_attr(device_id, 'name') ) }}"
+  awtrix_3: "{{ iif( device_attr(device_id, 'name_by_user') != none, device_attr(device_id, 'name_by_user'), device_attr(device_id, 'name') ) }}"
   effect_list: !input effect_list
   effect_random: "{{effect_list|random}}"
   duration: !input duration
