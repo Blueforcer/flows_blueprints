@@ -1,18 +1,18 @@
 blueprint:
   name: Awtrix current playing song
   description: Shows the  title and artist of your current playing song on Awtrix.
-  domain: automation 
+  domain: automation
   author: N1c093
   input:
-    awtrix_light:
+    awtrix_3:
       name: Awtrix Display
       description: Select the target Awtrix display.
       selector:
         device:
-          model: "AWTRIX Light"
+          model: "AWTRIX 3"
     media_player:
       name: Media Player Entity
-      description: Select your Media Player. 
+      description: Select your Media Player.
       selector:
         entity:
           filter:
@@ -89,21 +89,20 @@ blueprint:
         boolean:
       default: false
 
-
 mode: queued
 
 trigger:
   - platform: state
     entity_id: !input media_player
     attribute: media_title
-    from: 
+    from:
   - platform: state
     entity_id: !input media_player
-    from: 
+    from:
 
 variables:
-  device_id: !input awtrix_light
-  awtrix_light: "{{ iif( device_attr(device_id, 'name_by_user') != none, device_attr(device_id, 'name_by_user'), device_attr(device_id, 'name') ) }}"
+  device_id: !input awtrix_3
+  awtrix_3: "{{ iif( device_attr(device_id, 'name_by_user') != none, device_attr(device_id, 'name_by_user'), device_attr(device_id, 'name') ) }}"
   repeat_text: !input repeat_text
   show_rainbow: !input show_rainbow
   push_icon: !input push_icon
@@ -115,9 +114,7 @@ variables:
   display_type: !input display_type
   all_text: "{{state_attr(media_player, 'media_title')}} - {{state_attr(media_player, 'media_artist')}}"
 
-
-
-action:  
+action:
   if:
     - condition: state
       entity_id: !input media_player
@@ -129,7 +126,7 @@ action:
         data:
           qos: 0
           retain: false
-          topic: "{{awtrix_light}}/custom/mediaplayer"
+          topic: "{{awtrix_3}}/custom/mediaplayer"
           payload: |-
             {   
               "text": "{{ all_text }}",
@@ -146,7 +143,7 @@ action:
         data:
           qos: 0
           retain: false
-          topic: "{{awtrix_light}}/notify"
+          topic: "{{awtrix_3}}/notify"
           payload: |-
             {   
               "text": "{{ all_text }}",
@@ -165,6 +162,6 @@ action:
           data:
             qos: 0
             retain: false
-            topic: "{{awtrix_light}}/custom/mediaplayer"
+            topic: "{{awtrix_3}}/custom/mediaplayer"
             payload: |-
               {}
