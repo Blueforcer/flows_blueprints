@@ -6,9 +6,9 @@ This repository is dedicated exclusively to synchronizing with AWTRIX flows. It 
 
 Please note that this repository is **not intended for collaborative development or contributions**. Its primary purpose is to synchronize data with AWTRIX flows, ensuring that all blueprints remain up-to-date.
 
-### Pull Requests
+### Pull Requests & issues 
 
-I kindly ask my community members to refrain from submitting pull requests to this repository. **All pull requests will be ignored.** This policy is in place to maintain the integrity and consistency of the data being synchronized with AWTRIX flows.
+I kindly ask my community members to refrain from submitting pull requests or open issues to this repository. **All pull requests and issues will be ignored.** This policy is in place to maintain the integrity and consistency of the data being synchronized with AWTRIX flows.
 
 ### Editing Blueprints
 
