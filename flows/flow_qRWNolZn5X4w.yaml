@@ -23,8 +23,8 @@ blueprint:
       description: A sensor providing the current power received from your solar system.
       selector:
         entity:
-          domain:
-          - sensor
+          filter:
+            domain: sensor
           multiple: false
     threshold_high:
       name: Threshold for high solar production (W)
