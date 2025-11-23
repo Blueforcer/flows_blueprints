@@ -1,0 +1,156 @@
+blueprint:
+  name: Awtrix – Fun Fact anzeigen (Deutsch)
+  description: >
+    Zeigt einen deutschen Fun Fact auf einem Awtrix Display an.
+
+    ----------------------------------------------
+    BENÖTIGTE KONFIGURATION IN configuration.yaml:
+    ----------------------------------------------
+
+    Füge diesen REST-Sensor in deine configuration.yaml ein:
+
+    rest:
+      - resource: https://uselessfacts.jsph.pl/random.json?language=de
+        scan_interval: 21600  # alle 6 Stunden
+        sensor:
+          - name: Fun_Fact_Deutsch
+            value_template: "{{ value_json.text }}"
+
+    Danach gibt es den Sensor:
+      sensor.fun_fact_deutsch
+
+    Diesen Sensor kannst du unten im Blueprint auswählen.
+    ----------------------------------------------
+
+  domain: automation
+
+  input:
+
+    # Zeit-Trigger (optional)
+    trigger_time:
+      name: Uhrzeit (optional)
+      description: Zeitpunkt, an dem der Fun-Fact angezeigt wird (z. B. täglich 06:00)
+      default: ""
+      selector:
+        time:
+
+    # Intervall-Trigger (optional)
+    interval_hours:
+      name: Intervall in Stunden (optional)
+      description: Automation wird alle X Stunden ausgeführt
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 24
+          mode: slider
+
+    # Time-Pattern Trigger (optional)
+    pattern_hours:
+      name: Time Pattern Stunden (optional)
+      description: z. B. "/6" für alle 6 Stunden
+      default: ""
+      selector:
+        text:
+
+    # MQTT & Anzeigeparameter
+    awtrix_topic:
+      name: MQTT Topic (Custom App)
+      selector:
+        text:
+
+    funfact_sensor:
+      name: Fun Fact Sensor
+      selector:
+        entity:
+          domain: sensor
+
+    icon:
+      name: Icon-ID
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 20000
+          mode: box
+
+    color:
+      name: Textfarbe (HEX)
+      default: "00FFFF"
+      selector:
+        text:
+
+    scrollspeed:
+      name: Scrollgeschwindigkeit
+      default: 80
+      selector:
+        number:
+          min: 1
+          max: 300
+          mode: slider
+
+    repeat:
+      name: Wiederholungen
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 10
+          mode: slider
+
+    textcase:
+      name: Textschreibung
+      description: Auswahl der Textdarstellung für Awtrix
+      default: "0"
+      selector:
+        select:
+          options:
+            - label: Normal
+              value: "0"
+            - label: Großbuchstaben
+              value: "1"
+            - label: Kleinbuchstaben
+              value: "2"
+
+trigger:
+  - alias: Uhrzeit Trigger
+    platform: time
+    at: !input trigger_time
+    enabled: "{{ not (trigger_time == '' or trigger_time == None) }}"
+
+  - alias: Intervall Trigger
+    platform: time_pattern
+    hours: "/{{ interval_hours }}"
+    enabled: "{{ interval_hours | int > 0 }}"
+
+  - alias: Pattern Trigger
+    platform: time_pattern
+    hours: !input pattern_hours
+    enabled: "{{ not (pattern_hours == '' or pattern_hours == None) }}"
+
+variables:
+  topic: !input awtrix_topic
+  funfact_sensor: !input funfact_sensor
+  icon: !input icon
+  color: !input color
+  scrollspeed: !input scrollspeed
+  repeat: !input repeat
+  textcase: !input textcase
+
+action:
+  - service: mqtt.publish
+    data:
+      topic: "{{ topic }}"
+      retain: true
+      payload: >
+        {
+          "text": "{{ states(funfact_sensor) | default('Kein Fun Fact verfügbar') }}",
+          "icon": {{ icon }},
+          "rainbow": false,
+          "color": "{{ color }}",
+          "scrollSpeed": {{ scrollspeed }},
+          "repeat": {{ repeat }},
+          "textcase": {{ textcase | int }}
+        }
+
+mode: single
