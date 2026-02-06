@@ -1,0 +1,55 @@
+# Configuration Guide
+
+## 📦 Quick Setup
+
+### Prerequisites
+
+1. **AWTRIX 3** device connected via MQTT
+2. **Yahoo Finance integration** installed from HACS ([guide](https://github.com/iprak/yahoofinance))
+3. **Stock sensor** configured (e.g., `sensor.yahoofinance_aapl`)
+
+---
+
+## 🚀 Installation
+
+### Import Blueprint
+
+Click the badge or use manual method:
+
+[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FRaythekool%2Fha-awtrix-yahoofinance-stock%2Fblob%2Fmain%2Fawtrix_stock_display.yaml)
+
+**Manual:**
+1. **Settings** → **Automations & Scenes** → **Blueprints**
+2. Click **Import Blueprint**
+3. Paste: `https://github.com/Raythekool/ha-awtrix-yahoofinance-stock/blob/main/awtrix_stock_display.yaml`
+
+---
+
+## ⚙️ Configuration
+
+### Create Automation
+
+1. **Settings** → **Automations & Scenes** → **Create Automation**
+2. Select **Use a blueprint** → **AWTRIX Stock Display 📈**
+3. Fill in parameters:
+
+### Required Parameters
+
+| Parameter | Example | Description |
+|-----------|---------|-------------|
+| **AWTRIX Device** | Ulanzi TC001 | Your display |
+| **Stock Sensor** | `sensor.yahoofinance_aapl` | Yahoo Finance entity |
+| **Stock Symbol** | `AAPL` | Display name (keep short) |
+| **App Name** | `stock_aapl` | Unique ID for this stock |
+
+### Optional Parameters (defaults shown)
+
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| **Threshold** | `0.2%` | Min change for color coding |
+| **Lifetime** | `900s` | Display duration (0 = always) |
+| **Currency** | `€` | Symbol after price |
+| **Scroll Speed** | `100` | Higher = faster |
+| **Repeat** | `1` | Display repetitions |
+
+---
