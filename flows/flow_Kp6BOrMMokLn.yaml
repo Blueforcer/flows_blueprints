@@ -1,55 +1,137 @@
-# Configuration Guide
+FLOW CONFIGURATION
 
-## 📦 Quick Setup
+═══════════════════════════════════════════════════════════════
 
-### Prerequisites
+QUICK SETUP
+═══════════════════════════════════════════════════════════════
 
-1. **AWTRIX 3** device connected via MQTT
-2. **Yahoo Finance integration** installed from HACS ([guide](https://github.com/iprak/yahoofinance))
-3. **Stock sensor** configured (e.g., `sensor.yahoofinance_aapl`)
+Prerequisites:
+• AWTRIX 3 device connected via MQTT
+• Yahoo Finance integration from HACS
+• Stock sensor configured (e.g., sensor.yahoofinance_aapl)
 
----
+═══════════════════════════════════════════════════════════════
 
-## 🚀 Installation
+INSTALLATION
+═══════════════════════════════════════════════════════════════
 
-### Import Blueprint
+1. Import Blueprint
+   Settings → Automations & Scenes → Blueprints → Import Blueprint
+   URL: https://github.com/Raythekool/ha-awtrix-yahoofinance-stock
 
-Click the badge or use manual method:
+2. Create Automation
+   Settings → Automations → Create → Use blueprint → AWTRIX Stock Display
 
-[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FRaythekool%2Fha-awtrix-yahoofinance-stock%2Fblob%2Fmain%2Fawtrix_stock_display.yaml)
+═══════════════════════════════════════════════════════════════
 
-**Manual:**
-1. **Settings** → **Automations & Scenes** → **Blueprints**
-2. Click **Import Blueprint**
-3. Paste: `https://github.com/Raythekool/ha-awtrix-yahoofinance-stock/blob/main/awtrix_stock_display.yaml`
+REQUIRED PARAMETERS
+═══════════════════════════════════════════════════════════════
 
----
+AWTRIX Device........: Select your Ulanzi TC001
+Stock Sensor.........: sensor.yahoofinance_aapl
+Stock Symbol.........: AAPL (keep it short!)
+App Name.............: stock_aapl (unique for each stock)
 
-## ⚙️ Configuration
+═══════════════════════════════════════════════════════════════
 
-### Create Automation
+OPTIONAL PARAMETERS (defaults)
+═══════════════════════════════════════════════════════════════
 
-1. **Settings** → **Automations & Scenes** → **Create Automation**
-2. Select **Use a blueprint** → **AWTRIX Stock Display 📈**
-3. Fill in parameters:
+Threshold............: 0.2% (color change sensitivity)
+Lifetime.............: 900s (15 min auto-refresh)
+Currency.............: € (or $, £, ¥)
+Scroll Speed.........: 100 (higher = faster)
+Repeat...............: 1 (display times)
 
-### Required Parameters
+═══════════════════════════════════════════════════════════════
 
-| Parameter | Example | Description |
-|-----------|---------|-------------|
-| **AWTRIX Device** | Ulanzi TC001 | Your display |
-| **Stock Sensor** | `sensor.yahoofinance_aapl` | Yahoo Finance entity |
-| **Stock Symbol** | `AAPL` | Display name (keep short) |
-| **App Name** | `stock_aapl` | Unique ID for this stock |
+QUICK EXAMPLES
+═══════════════════════════════════════════════════════════════
 
-### Optional Parameters (defaults shown)
+Example 1: Apple Stock
+  Sensor: sensor.yahoofinance_aapl
+  Symbol: AAPL
+  App: stock_apple
+  Currency: $
+  Display: AAPL 150.25$ (+2.1%)
 
-| Parameter | Default | Notes |
-|-----------|---------|-------|
-| **Threshold** | `0.2%` | Min change for color coding |
-| **Lifetime** | `900s` | Display duration (0 = always) |
-| **Currency** | `€` | Symbol after price |
-| **Scroll Speed** | `100` | Higher = faster |
-| **Repeat** | `1` | Display repetitions |
+Example 2: Bitcoin
+  Sensor: sensor.yahoofinance_btc_usd
+  Symbol: BTC
+  App: stock_bitcoin
+  Currency: $
+  Threshold: 1.0% (crypto volatility)
+  Display: BTC 45000$ (-3.5%)
 
----
+Example 3: S&P 500
+  Sensor: sensor.yahoofinance_spy
+  Symbol: S&P500
+  App: stock_sp500
+  Display: S&P500 4850$ (+0.3%)
+
+═══════════════════════════════════════════════════════════════
+
+MULTIPLE STOCKS
+═══════════════════════════════════════════════════════════════
+
+Create separate automations with unique app names:
+  Stock 1: stock_aapl
+  Stock 2: stock_tsla
+  Stock 3: stock_btc
+
+They'll automatically cycle on your display!
+
+═══════════════════════════════════════════════════════════════
+
+COLOR CODING
+═══════════════════════════════════════════════════════════════
+
+🟢 Green: Gain > threshold
+🔴 Red: Loss > threshold
+⚪ White: Within threshold range
+
+Threshold recommendations:
+  Stocks.......: 0.2% (default)
+  Crypto.......: 1.0-2.0% (volatile)
+  Indices......: 0.1% (stable)
+
+═══════════════════════════════════════════════════════════════
+
+TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════
+
+Not displaying?
+  → Developer Tools → States → Check sensor value
+  → Automations → Find stock automation → Run manually
+  → Settings → System → Logs → Look for update messages
+
+Wrong colors?
+  → Check price change vs threshold setting
+  → Lower threshold for more sensitivity
+
+Text too long?
+  → Use short symbols (AAPL not Apple Inc.)
+  → Increase scroll speed (150-200)
+  → Remove currency symbol
+
+═══════════════════════════════════════════════════════════════
+
+PRO TIPS
+═══════════════════════════════════════════════════════════════
+
+✓ Keep symbols SHORT for 8x32 display
+✓ Match threshold to asset volatility
+✓ Lifetime = 0 for always visible
+✓ Create themed portfolios
+✓ Monitor logs first few days to tune
+
+═══════════════════════════════════════════════════════════════
+
+SUPPORT
+═══════════════════════════════════════════════════════════════
+
+GitHub: https://github.com/Raythekool/ha-awtrix-yahoofinance-stock
+Issues: https://github.com/Raythekool/ha-awtrix-yahoofinance-stock/issues
+Coffee: https://buymeacoffee.com/raythekool
+
+═══════════════════════════════════════════════════════════════
