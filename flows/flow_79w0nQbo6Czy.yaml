@@ -1,0 +1,125 @@
+blueprint:
+  name: AWTRIX NG – Now Playing
+  description: >-
+    Displays artist, title and playback progress from a media player as an
+    AWTRIX NG pushed app. The app is removed when playback stops.
+  domain: automation
+  author: Hank_the_Tank / Codex
+  input:
+    awtrix_mqtt_prefix:
+      name: AWTRIX NG
+      description: >-
+        Enter the MQTT prefix configured on the AWTRIX NG MQTT page,
+        for example awtrixNG. Do not add a trailing slash.
+      default: awtrixNG
+      selector:
+        text:
+
+    media_player:
+      name: Media Player
+      description: Select the media player whose current track should be displayed.
+      selector:
+        entity:
+          domain: media_player
+
+    icon_id:
+      name: AWTRIX NG Icon ID
+      description: Enter the ID of an icon already stored on the AWTRIX NG.
+      default: "44739"
+      selector:
+        text:
+
+    repeat_count:
+      name: Repeat
+      description: >-
+        Number of completed text scrolls. Use 0 to rely on the normal app duration.
+      default: 3
+      selector:
+        number:
+          mode: box
+          min: 0
+          max: 100
+          step: 1
+
+    progress_color:
+      name: Progress Color
+      description: Select the color of the filled playback progress bar.
+      default: [85, 170, 255]
+      selector:
+        color_rgb:
+
+mode: restart
+
+triggers:
+  - trigger: state
+    entity_id: !input media_player
+  - trigger: time_pattern
+    seconds: /5
+
+variables:
+  awtrix_mqtt_prefix: !input awtrix_mqtt_prefix
+  media_player_entity: !input media_player
+  icon_id: !input icon_id
+  repeat_count: !input repeat_count
+  progress_color: !input progress_color
+
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ is_state(media_player_entity, 'playing') }}"
+        sequence:
+          - variables:
+              progress_percent: |-
+                {% set duration =
+                  state_attr(media_player_entity, 'media_duration') | float(0) %}
+                {% set position =
+                  state_attr(media_player_entity, 'media_position') | float(0) %}
+                {% set updated =
+                  state_attr(media_player_entity, 'media_position_updated_at') %}
+                {% if duration > 0 %}
+                  {% set elapsed =
+                    as_timestamp(now())
+                    - as_timestamp(updated, as_timestamp(now())) %}
+                  {% set current = position + ([elapsed, 0] | max) %}
+                  {% set percentage =
+                    (current / duration * 100) | round(0) | int %}
+                  {{ [[percentage, 0] | max, 100] | min }}
+                {% else %}
+                  0
+                {% endif %}
+
+          - action: mqtt.publish
+            data:
+              evaluate_payload: false
+              qos: 0
+              retain: false
+              topic: "{{ awtrix_mqtt_prefix ~ '/cmd/apps/pushed/NowPlaying' }}"
+              payload: >-
+                {{
+                  {
+                    'text': (
+                      (state_attr(media_player_entity, 'media_artist') or '')
+                      ~ ' - '
+                      ~ (state_attr(media_player_entity, 'media_title') or '')
+                    ),
+                    'icon': icon_id,
+                    'repeat': repeat_count | int,
+                    'textOffsetX': 23,
+                    'scroll': {
+                      'mode': 'wrap'
+                    },
+                    'progress': progress_percent | int,
+                    'progressColor': progress_color,
+                    'progressTrackColor': '#303030'
+                  } | to_json
+                }}
+
+    default:
+      - action: mqtt.publish
+        data:
+          evaluate_payload: false
+          qos: 0
+          retain: false
+          topic: "{{ awtrix_mqtt_prefix ~ '/cmd/apps/pushed/NowPlaying' }}"
+          payload: ""
