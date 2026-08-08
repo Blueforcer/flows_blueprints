@@ -58,8 +58,6 @@ blueprint:
       selector:
         entity:
 
-mode: restart
-
 triggers:
   - trigger: state
     entity_id: !input team_sensor
