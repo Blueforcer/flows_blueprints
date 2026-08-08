@@ -1,0 +1,213 @@
+blueprint:
+  name: 🏈 AWTRIX NG – NFL Scoreboard
+  author: Hank_the_Tank / AWTRIX NG migration
+  description: >-
+    # NFL Scoreboard for AWTRIX NG ver. 1.0
+
+    Displays the live score of an NFL game from a HACS Team Tracker sensor.
+    The home and away sides use their team colors, while four pixels along the
+    bottom show the current quarter. During overtime, all quarter pixels turn
+    amber. The pushed app is removed automatically when the game is no longer
+    live.
+
+    ## Requirements
+
+    - Home Assistant 2024.11 or newer
+    - MQTT integration
+    - AWTRIX NG with Home Assistant discovery enabled
+    - HACS Team Tracker integration
+
+  domain: automation
+
+  input:
+    awtrix_devices:
+      name: AWTRIX NG devices
+      description: Select one or more AWTRIX NG devices.
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+              model: AWTRIX NG
+
+    app_name:
+      name: AWTRIX app name
+      description: >-
+        Unique pushed-app name. Use only letters, numbers, underscores and
+        hyphens, with a maximum length of 32 characters.
+      default: nfl_team_score
+      selector:
+        text:
+
+    message_duration:
+      name: Display duration
+      description: How long the scoreboard remains visible per rotation.
+      default: 15
+      selector:
+        number:
+          min: 0
+          max: 300
+          step: 1
+          mode: box
+          unit_of_measurement: s
+
+    team_sensor:
+      name: Team Tracker sensor
+      description: Select the Team Tracker sensor for your NFL team.
+      selector:
+        entity:
+
+mode: restart
+
+triggers:
+  - trigger: state
+    entity_id: !input team_sensor
+    id: game_state
+
+  - trigger: state
+    entity_id: !input team_sensor
+    attribute: team_score
+    id: game_update
+
+  - trigger: state
+    entity_id: !input team_sensor
+    attribute: opponent_score
+    id: game_update
+
+  - trigger: state
+    entity_id: !input team_sensor
+    attribute: quarter
+    id: game_update
+
+variables:
+  device_ids: !input awtrix_devices
+  app_name: !input app_name
+  team_sensor: !input team_sensor
+  message_duration: !input message_duration
+
+  mqtt_prefixes: >-
+    {% set ns = namespace(prefixes=[]) %}
+    {% for device_id in device_ids %}
+      {% set entities = device_entities(device_id)
+        | select('search', 'mqtt_prefix') | list %}
+      {% if entities | length > 0 %}
+        {% set prefix = states(entities[0]) | trim %}
+        {% if prefix not in ['', 'unknown', 'unavailable'] %}
+          {% set ns.prefixes = ns.prefixes + [prefix] %}
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.prefixes | unique | list }}
+
+  home_game: "{{ state_attr(team_sensor, 'team_homeaway') == 'home' }}"
+
+  team_colors: >-
+    {% set colors = state_attr(team_sensor, 'team_colors') or [] %}
+    {% if colors | length >= 2
+          and (colors[0] | lower) in ['#000000', '000000']
+          and (colors[1] | lower) in ['#000000', '000000'] %}
+      {{ ['#404040', '#FFFFFF'] }}
+    {% elif colors | length > 0 %}
+      {{ colors }}
+    {% else %}
+      {{ ['#404040', '#FFFFFF'] }}
+    {% endif %}
+
+  opponent_colors: >-
+    {% set colors = state_attr(team_sensor, 'opponent_colors') or [] %}
+    {% if colors | length >= 2
+          and colors[0] | lower in ['#000000', '000000']
+          and colors[1] | lower in ['#000000', '000000'] %}
+      {{ ['#404040', '#FFFFFF'] }}
+    {% elif colors | length > 0 %}
+      {{ colors }}
+    {% else %}
+      {{ ['#404040', '#FFFFFF'] }}
+    {% endif %}
+
+  home_colors: "{{ team_colors if home_game else opponent_colors }}"
+  away_colors: "{{ opponent_colors if home_game else team_colors }}"
+
+  home_color_1: >-
+    {{ home_colors[0] if home_colors | length > 0 else '#404040' }}
+  home_color_2: >-
+    {{ home_colors[1] if home_colors | length > 1 else '#FFFFFF' }}
+  away_color_1: >-
+    {{ away_colors[0] if away_colors | length > 0 else '#404040' }}
+  away_color_2: >-
+    {{ away_colors[1] if away_colors | length > 1 else '#FFFFFF' }}
+
+  home_score_number: >-
+    {{ (state_attr(team_sensor, 'team_score') if home_game
+        else state_attr(team_sensor, 'opponent_score')) | int(0) }}
+  away_score_number: >-
+    {{ (state_attr(team_sensor, 'opponent_score') if home_game
+        else state_attr(team_sensor, 'team_score')) | int(0) }}
+  home_score: "{{ '%02d' | format(home_score_number | int(0)) }}"
+  away_score: "{{ '%02d' | format(away_score_number | int(0)) }}"
+
+  quarter: "{{ state_attr(team_sensor, 'quarter') | int(0) }}"
+  quarter_draw: >-
+    {% set inactive = '#707070' %}
+    {% set active = '#FFB000' if quarter | int > 4 else '#FFFFFF' %}
+    {{ [
+      ['pixel', 12, 7, active if quarter | int >= 1 else inactive],
+      ['pixel', 14, 7, active if quarter | int >= 2 else inactive],
+      ['pixel', 17, 7, active if quarter | int >= 3 else inactive],
+      ['pixel', 19, 7, active if quarter | int >= 4 else inactive]
+    ] }}
+
+conditions: []
+
+actions:
+  - repeat:
+      for_each: "{{ mqtt_prefixes }}"
+      sequence:
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ is_state(team_sensor, 'IN') }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: >-
+                      {{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}
+                    payload: >-
+                      {{
+                        {
+                          'draw': [
+                            ['rectFill', 0, 0, 16, 8, home_color_1],
+                            ['rectFill', 16, 0, 16, 8, away_color_1],
+                            ['line', 1, 0, 1, 7, home_color_2],
+                            ['line', 3, 0, 3, 7, home_color_2],
+                            ['line', 28, 0, 28, 7, away_color_2],
+                            ['line', 30, 0, 30, 7, away_color_2],
+                            ['text', 7, 1, home_score, '#FFFFFF'],
+                            ['text', 18, 1, away_score, '#FFFFFF'],
+                            ['line', 15, 3, 16, 3, '#FFFFFF']
+                          ] + quarter_draw,
+                          'durationMs': (message_duration | int) * 1000
+                        } | to_json
+                      }}
+
+                - action: mqtt.publish
+                  data:
+                    qos: 0
+                    retain: false
+                    topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
+                    payload: >-
+                      {{ {'name': app_name, 'fast': true} | to_json }}
+
+          default:
+            - action: mqtt.publish
+              data:
+                qos: 0
+                retain: false
+                topic: >-
+                  {{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}
+                payload: ""
+
+mode: restart
