@@ -2,7 +2,7 @@ blueprint:
   name: ⚽ AWTRIX NG – Fußball Scoreboard ⚽
   author: Hank_the_Tank / AWTRIX NG migration
   description: >-
-    # Fußball Scoreboard for AWTRIX NG ver. 1.0
+    # Fußball Scoreboard for AWTRIX NG ver. 1.1
 
     Displays a live football score from the HACS Team Tracker integration on
     one or more AWTRIX NG devices. The colors on the left and right represent
@@ -104,6 +104,11 @@ triggers:
     attribute: opponent_score
     id: score_changed
 
+  - trigger: state
+    entity_id: !input team_sensor
+    attribute: last_play
+    id: prediction_changed
+
 variables:
   device_ids: !input awtrix_devices
   app_name: !input app_name
@@ -168,6 +173,33 @@ variables:
   away_color_2: >-
     {{ away_colors[1] if away_colors | length > 1 else away_color_1 }}
 
+  prediction_values: >-
+    {{ (state_attr(team_sensor, 'last_play') or '')
+       | regex_findall('([0-9]+(?:\.[0-9]+)?)%') }}
+  team_prediction: >-
+    {{ prediction_values[0] | float(0)
+       if prediction_values | length >= 2 else 0 }}
+  opponent_prediction: >-
+    {{ prediction_values[1] | float(0)
+       if prediction_values | length >= 2 else 0 }}
+  home_prediction: >-
+    {{ team_prediction if home_game else opponent_prediction }}
+  prediction_pixels: >-
+    {% set bar = namespace(items=[]) %}
+    {% if prediction_values | length >= 2 %}
+      {% set home_width = (home_prediction | float(0) * 16 / 100)
+         | round(0) | int %}
+      {% set home_width = 0 if home_width < 0
+         else 16 if home_width > 16 else home_width %}
+      {% for x in range(16) %}
+        {% set color = home_color_1
+           if x < home_width else away_color_1 %}
+        {% set bar.items =
+          bar.items + [['pixel', 8 + x, 7, color]] %}
+      {% endfor %}
+    {% endif %}
+    {{ bar.items }}
+
   home_score: >-
     {{ (state_attr(team_sensor, 'team_score') if home_game
         else state_attr(team_sensor, 'opponent_score')) | default(0, true) }}
@@ -187,6 +219,7 @@ actions:
                   id:
                     - game_live
                     - score_changed
+                    - prediction_changed
                 - condition: template
                   value_template: "{{ is_state(team_sensor, 'IN') }}"
               sequence:
@@ -214,7 +247,7 @@ actions:
                             ['line', 27, 0, 28, 0, away_color_1],
                             ['line', 26, 2, 26, 7, away_color_2],
                             ['line', 29, 2, 29, 7, away_color_2]
-                          ],
+                          ] + prediction_pixels,
                           'durationMs': (message_duration | int) * 1000,
                           'backgroundColor': '#006C28'
                         } | to_json
