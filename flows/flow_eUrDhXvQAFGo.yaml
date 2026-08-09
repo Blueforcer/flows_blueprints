@@ -2,7 +2,7 @@ blueprint:
   name: ⚽ AWTRIX NG – Fußball Scoreboard ⚽
   author: Hank_the_Tank / AWTRIX NG migration
   description: >-
-    # Fußball Scoreboard for AWTRIX NG ver. 1.1
+    # Fußball Scoreboard for AWTRIX NG ver. 1.2
 
     Displays a live football score from the HACS Team Tracker integration on
     one or more AWTRIX NG devices. The colors on the left and right represent
@@ -71,6 +71,36 @@ blueprint:
       selector:
         color_rgb:
 
+    jersey_style:
+      name: Jersey style
+      description: Select the jersey design used for your tracked team.
+      default: Classic
+      selector:
+        select:
+          options:
+            - label: Standard
+              value: Classic
+            - label: Shoulders
+              value: Shoulders
+            - label: Center Band
+              value: Center Band
+            - label: Diagonal
+              value: Diagonal
+
+    show_prediction_bar:
+      name: Show prediction bar
+      description: Display the live win probability below the score.
+      default: true
+      selector:
+        boolean:
+
+    green_background:
+      name: Green pitch background
+      description: Use green (#006C28) when enabled or black (#000000) when disabled.
+      default: true
+      selector:
+        boolean:
+
 mode: restart
 
 triggers:
@@ -116,6 +146,12 @@ variables:
   message_duration: !input message_duration
   fallback_team_color_1_rgb: !input fallback_team_color_1
   fallback_team_color_2_rgb: !input fallback_team_color_2
+  jersey_style: !input jersey_style
+  show_prediction_bar: !input show_prediction_bar
+  green_background: !input green_background
+
+  background_color: >-
+    {{ '#006C28' if green_background else '#000000' }}
 
   fallback_team_color_1: >-
     {{ '#%02X%02X%02X' | format(
@@ -173,6 +209,78 @@ variables:
   away_color_2: >-
     {{ away_colors[1] if away_colors | length > 1 else away_color_1 }}
 
+  left_jersey_draw: >-
+    {% if not home_game or jersey_style == 'Classic' %}
+      {{ [
+        ['rectFill', 2, 0, 4, 1, home_color_1],
+        ['rectFill', 0, 1, 8, 2, home_color_1],
+        ['rectFill', 1, 3, 6, 5, home_color_1],
+        ['line', 2, 1, 2, 7, home_color_2],
+        ['line', 5, 1, 5, 7, home_color_2]
+      ] }}
+    {% elif jersey_style == 'Shoulders' %}
+      {{ [
+        ['rectFill', 2, 0, 4, 1, home_color_2],
+        ['rectFill', 0, 1, 8, 2, home_color_2],
+        ['rectFill', 3, 1, 2, 1, home_color_1],
+        ['rectFill', 2, 2, 4, 1, home_color_1],
+        ['rectFill', 1, 3, 6, 5, home_color_1]
+      ] }}
+    {% elif jersey_style == 'Center Band' %}
+      {{ [
+        ['rectFill', 2, 0, 4, 1, home_color_1],
+        ['rectFill', 0, 1, 8, 2, home_color_1],
+        ['rectFill', 1, 3, 6, 5, home_color_1],
+        ['rectFill', 1, 3, 6, 2, home_color_2]
+      ] }}
+    {% else %}
+      {{ [
+        ['rectFill', 2, 0, 4, 1, home_color_1],
+        ['rectFill', 0, 1, 8, 2, home_color_1],
+        ['rectFill', 1, 3, 6, 5, home_color_1],
+        ['pixel', 6, 4, home_color_2],
+        ['rectFill', 5, 5, 2, 1, home_color_2],
+        ['rectFill', 4, 6, 3, 1, home_color_2],
+        ['rectFill', 3, 7, 4, 1, home_color_2]
+      ] }}
+    {% endif %}
+
+  right_jersey_draw: >-
+    {% if home_game or jersey_style == 'Classic' %}
+      {{ [
+        ['rectFill', 26, 0, 4, 1, away_color_1],
+        ['rectFill', 24, 1, 8, 2, away_color_1],
+        ['rectFill', 25, 3, 6, 5, away_color_1],
+        ['line', 26, 1, 26, 7, away_color_2],
+        ['line', 29, 1, 29, 7, away_color_2]
+      ] }}
+    {% elif jersey_style == 'Shoulders' %}
+      {{ [
+        ['rectFill', 26, 0, 4, 1, away_color_2],
+        ['rectFill', 24, 1, 8, 2, away_color_2],
+        ['rectFill', 27, 1, 2, 1, away_color_1],
+        ['rectFill', 26, 2, 4, 1, away_color_1],
+        ['rectFill', 25, 3, 6, 5, away_color_1]
+      ] }}
+    {% elif jersey_style == 'Center Band' %}
+      {{ [
+        ['rectFill', 26, 0, 4, 1, away_color_1],
+        ['rectFill', 24, 1, 8, 2, away_color_1],
+        ['rectFill', 25, 3, 6, 5, away_color_1],
+        ['rectFill', 25, 3, 6, 2, away_color_2]
+      ] }}
+    {% else %}
+      {{ [
+        ['rectFill', 26, 0, 4, 1, away_color_1],
+        ['rectFill', 24, 1, 8, 2, away_color_1],
+        ['rectFill', 25, 3, 6, 5, away_color_1],
+        ['pixel', 25, 4, away_color_2],
+        ['rectFill', 25, 5, 2, 1, away_color_2],
+        ['rectFill', 25, 6, 3, 1, away_color_2],
+        ['rectFill', 25, 7, 4, 1, away_color_2]
+      ] }}
+    {% endif %}
+
   prediction_values: >-
     {{ (state_attr(team_sensor, 'last_play') or '')
        | regex_findall('([0-9]+(?:\.[0-9]+)?)%') }}
@@ -186,7 +294,7 @@ variables:
     {{ team_prediction if home_game else opponent_prediction }}
   prediction_pixels: >-
     {% set bar = namespace(items=[]) %}
-    {% if prediction_values | length >= 2 %}
+    {% if show_prediction_bar and prediction_values | length >= 2 %}
       {% set home_width = (home_prediction | float(0) * 16 / 100)
          | round(0) | int %}
       {% set home_width = 0 if home_width < 0
@@ -222,6 +330,10 @@ actions:
                     - prediction_changed
                 - condition: template
                   value_template: "{{ is_state(team_sensor, 'IN') }}"
+                - condition: template
+                  value_template: >-
+                    {{ trigger.id != 'prediction_changed'
+                       or show_prediction_bar }}
               sequence:
                 - action: mqtt.publish
                   data:
@@ -236,20 +348,11 @@ actions:
                           'textColor': '#FFFFFF',
                           'textCenter': true,
                           'scroll': 'static',
-                          'draw': [
-                            ['rectFill', 0, 1, 8, 2, home_color_1],
-                            ['rectFill', 1, 3, 6, 5, home_color_1],
-                            ['line', 3, 0, 4, 0, home_color_1],
-                            ['line', 2, 2, 2, 7, home_color_2],
-                            ['line', 5, 2, 5, 7, home_color_2],
-                            ['rectFill', 24, 1, 8, 2, away_color_1],
-                            ['rectFill', 25, 3, 6, 5, away_color_1],
-                            ['line', 27, 0, 28, 0, away_color_1],
-                            ['line', 26, 2, 26, 7, away_color_2],
-                            ['line', 29, 2, 29, 7, away_color_2]
-                          ] + prediction_pixels,
+                          'draw': left_jersey_draw
+                            + right_jersey_draw
+                            + prediction_pixels,
                           'durationMs': (message_duration | int) * 1000,
-                          'backgroundColor': '#006C28'
+                          'backgroundColor': background_color
                         } | to_json
                       }}
 
