@@ -9,8 +9,8 @@ blueprint:
   domain: automation
   input:
     awtrix:
-      name: AWTRIX Device
-      description: Select the Awtrix light device
+      name: AWTRIX NG Device
+      description: Select the Awtrix NG device
       selector:
         device:
           integration: mqtt
@@ -47,13 +47,13 @@ blueprint:
       default: 100
     skip_if_zero_watts:
       name: Hide solar production if at 0 Watts
-      description: 'This will not show the solar energy production on your awtrix if the production is below 0 Watts.'
+      description: 'This will not show the solar energy production on your AWTRIX NG if the production is below 0 Watts.'
       selector:
         boolean:
       default: false
     skip_during_night_hours:
       name: Hide solar production during night time
-      description: 'This will not show the solar energy production on your awtrix during night hours (as specified below).'
+      description: 'This will not show the solar energy production on your AWTRIX NG during night hours (as specified below).'
       selector:
         boolean:
       default: false
@@ -121,7 +121,7 @@ action:
           {% set night_end = night_end %}
           {{ (skip_during_night_hours and ((now_time < night_end) or (now_time > night_start))) or (skip_if_zero_watts and (power_level == 0)) }}
       sequence:
-        # It is night time, skipping sending solar power data to Awtrix Light.
+        # It is night time, skipping sending solar power data to AWTRIX NG.
       - repeat:
           for_each: "{{ devices_topics }}"
           sequence:
