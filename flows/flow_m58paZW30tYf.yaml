@@ -19,7 +19,7 @@ blueprint:
           multiple: true
     power_source:
       name: Power Sensor
-      description: A sensor providing the current power received from your solar system.
+      description: A sensor providing the current power (W) received from your solar system.
       selector:
         entity:
           domain:
