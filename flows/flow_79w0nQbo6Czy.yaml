@@ -2,7 +2,8 @@ blueprint:
   name: AWTRIX NG – Now Playing
   description: >-
     Displays artist, title and playback progress from a media player as an
-    AWTRIX NG pushed app. The app is removed when playback stops.
+    AWTRIX NG pushed app. The app is removed when playback stops. The scrolling
+    text can optionally use one of the built-in AWTRIX NG color palettes.
   domain: automation
   author: Hank_the_Tank / Codex
   input:
@@ -41,6 +42,26 @@ blueprint:
           max: 100
           step: 1
 
+    text_palette:
+      name: Text Color Palette
+      description: >-
+        Select an AWTRIX NG built-in palette for the scrolling artist and title.
+        Choose White (no palette) to display normal white text.
+      default: White (no palette)
+      selector:
+        select:
+          mode: dropdown
+          options:
+            - White (no palette)
+            - Cloud
+            - Lava
+            - Ocean
+            - Forest
+            - Stripe
+            - Party
+            - Heat
+            - Rainbow
+
     progress_color:
       name: Progress Color
       description: Select the color of the filled playback progress bar.
@@ -53,6 +74,7 @@ mode: restart
 triggers:
   - trigger: state
     entity_id: !input media_player
+
   - trigger: time_pattern
     seconds: /5
 
@@ -61,6 +83,7 @@ variables:
   media_player_entity: !input media_player
   icon_id: !input icon_id
   repeat_count: !input repeat_count
+  text_palette: !input text_palette
   progress_color: !input progress_color
 
 actions:
@@ -96,24 +119,30 @@ actions:
               retain: false
               topic: "{{ awtrix_mqtt_prefix ~ '/cmd/apps/pushed/NowPlaying' }}"
               payload: >-
-                {{
-                  {
-                    'text': (
-                      (state_attr(media_player_entity, 'media_artist') or '')
-                      ~ ' - '
-                      ~ (state_attr(media_player_entity, 'media_title') or '')
-                    ),
-                    'icon': icon_id,
-                    'repeat': repeat_count | int,
-                    'textOffsetX': 23,
-                    'scroll': {
-                      'mode': 'wrap'
-                    },
-                    'progress': progress_percent | int,
-                    'progressColor': progress_color,
-                    'progressTrackColor': '#303030'
-                  } | to_json
-                }}
+                {% set base_payload = {
+                  'text':
+                    (state_attr(media_player_entity, 'media_artist') or '')
+                    ~ ' - '
+                    ~ (state_attr(media_player_entity, 'media_title') or ''),
+                  'icon': icon_id,
+                  'repeat': repeat_count | int,
+                  'textOffsetX': 23,
+                  'scroll': {
+                    'mode': 'wrap'
+                  },
+                  'progress': progress_percent | int,
+                  'progressColor': progress_color,
+                  'progressTrackColor': '#303030'
+                } %}
+                {% if text_palette == 'White (no palette)' %}
+                  {{ dict(base_payload, textColor='#FFFFFF') | to_json }}
+                {% else %}
+                  {{ dict(
+                    base_payload,
+                    textColor='palette',
+                    palette=text_palette
+                  ) | to_json }}
+                {% endif %}
 
     default:
       - action: mqtt.publish
