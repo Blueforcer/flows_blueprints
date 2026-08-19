@@ -1,0 +1,136 @@
+blueprint:
+  name: "AWTRIX NG - Media Player Now Playing"
+  description: >
+    Zeigt Interpret und Titel eines Media Players auf einem oder mehreren
+    AWTRIX NG Geräten an, solange etwas abgespielt wird. Das Icon bleibt
+    fix stehen und läuft nicht mit dem Text mit.
+
+  domain: automation
+  input:
+    awtrix:
+      name: AWTRIX NG Gerät(e)
+      description: Wähle das/die AWTRIX NG Gerät(e) aus, auf denen der Titel angezeigt werden soll.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+              model: AWTRIX NG
+          multiple: true
+    media_player:
+      name: Media Player
+      description: Der Media Player, dessen Wiedergabe angezeigt werden soll.
+      selector:
+        entity:
+          filter:
+            - domain: media_player
+          multiple: false
+    icon:
+      name: Icon
+      description: >-
+        Name oder ID des Icons (muss auf dem AWTRIX Gerät vorhanden/hochgeladen sein).
+        Bleibt fix stehen und läuft nicht mit dem Text mit.
+      default: "11683"
+      selector:
+        text: {}
+    text_color:
+      name: Textfarbe
+      description: Farbe des Interpret/Titel-Texts.
+      default: "#FFFFFF"
+      selector:
+        text: {}
+    duration:
+      name: Anzeigedauer (Sekunden)
+      description: Wie lange die App pro Durchlauf in der App-Rotation angezeigt wird.
+      default: 10
+      selector:
+        number:
+          min: 3
+          max: 60
+          mode: slider
+          unit_of_measurement: s
+
+mode: restart
+max_exceeded: silent
+
+variables:
+  device_ids: !input awtrix
+  media_player: !input media_player
+  icon: !input icon
+  text_color: !input text_color
+  duration: !input duration
+  app_name: now_playing
+  device_prefixes: >-
+    {%- set result = namespace(items=[]) -%}
+    {%- for device_id in device_ids -%}
+      {%- set prefix_entities = device_entities(device_id) | select('search', 'mqtt_prefix') | list -%}
+      {%- if prefix_entities | length > 0 -%}
+        {%- set prefix = states(prefix_entities | first) -%}
+        {%- if prefix not in ['unknown', 'unavailable', 'none', ''] -%}
+          {%- set result.items = result.items + [prefix] -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ result.items | unique | list }}
+  is_playing: "{{ states(media_player) == 'playing' }}"
+  media_artist: "{{ state_attr(media_player, 'media_artist') | default('', true) }}"
+  media_title: "{{ state_attr(media_player, 'media_title') | default('', true) }}"
+  now_playing_text: >-
+    {%- if media_artist and media_title -%}
+      {{ media_artist }} - {{ media_title }}
+    {%- elif media_title -%}
+      {{ media_title }}
+    {%- else -%}
+      {{ media_artist }}
+    {%- endif -%}
+  payload: >-
+    {{ {
+      'text': now_playing_text,
+      'icon': icon,
+      'iconMode': 'fixed',
+      'textColor': text_color,
+      'durationMs': (duration | int) * 1000
+    } | tojson }}
+
+triggers:
+  - trigger: state
+    entity_id: !input media_player
+    id: media_player_changed
+  - trigger: homeassistant
+    event: start
+    id: startup
+  - trigger: mqtt
+    topic: "+/availability"
+    payload: online
+    id: awtrix_online
+
+conditions:
+  - condition: template
+    value_template: >-
+      {{
+        trigger is not defined
+        or trigger.id != 'awtrix_online'
+        or trigger.topic | regex_replace('/availability$', '') in device_prefixes
+      }}
+
+actions:
+  - repeat:
+      for_each: "{{ device_prefixes }}"
+      sequence:
+        - if:
+            - condition: template
+              value_template: "{{ is_playing }}"
+          then:
+            - action: mqtt.publish
+              data:
+                qos: 0
+                retain: false
+                topic: "{{ repeat.item }}/cmd/apps/pushed/{{ app_name }}"
+                payload: "{{ payload }}"
+          else:
+            - action: mqtt.publish
+              data:
+                qos: 0
+                retain: false
+                topic: "{{ repeat.item }}/cmd/apps/pushed/{{ app_name }}"
+                payload: ""
