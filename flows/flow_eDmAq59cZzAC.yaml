@@ -1,0 +1,225 @@
+blueprint:
+  name: "Awtrix NG – Claude Usage"
+  description: >
+    Displays your Claude usage on an Awtrix NG LED matrix.
+    Shows usage percentage with a progress bar, color-coded by thresholds.
+    Triggers on Home Assistant start and on a configurable time pattern.
+    It uses a custom icon you need to install.
+    Rewritten for AWTRIX NG (the successor firmware to AWTRIX 3 / AWTRIX Light) —
+    uses the new pushed-app MQTT topic and payload keys.
+  domain: automation
+  author: "tnusch"
+  homeassistant:
+    min_version: "2024.6.0"
+  input:
+    usage_sensor:
+      name: Claude Usage Sensor
+      description: >
+        Sensor that provides your Claude (weekly or session) usage as a percentage (0–100), 
+        e.g. via https://github.com/trickv/hass-claude-usage
+      selector:
+        entity:
+          domain: sensor
+    awtrix:
+      name: AWTRIX Device
+      description: Select the AWTRIX device
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+
+    app_name:
+      name: AWTRIX Application name
+      description: This is the app name used in the pushed-app MQTT topic - it should be unique
+      selector:
+        text:
+      default: claude_usage
+      
+    icon_id:
+      name: Awtrix Icon ID
+      description: >
+        Icon number pre-loaded on your Awtrix for Claude.
+        The same 8x8 icon IDs from AWTRIX 3 still work on AWTRIX NG.
+        Find out more about icons on https://blueforcer.github.io/awtrix-ng/guides/icons/.
+      default: "74725"
+      selector:
+        text:
+        
+    suffix_text:
+      name: Suffix to display
+      description: Suffix to be displayed on AWTRIX to indicate usage type (e.g. "wk" for weekly, "se" for session)
+      selector:
+        text:
+      default: "wk"
+      
+    base_color:
+      name: Base Text & Progress Color
+      description: >
+        Hex color (without #) used for the text and progress bar (default as Claude brand color).
+      default: "DE7356"
+      selector:
+        text:
+
+    threshold_warn:
+      name: Warning Threshold (%)
+      description: >
+        Usage above this percentage → yellow text color.
+      default: 50
+      selector:
+        number:
+          min: 1
+          max: 99
+          step: 1
+          mode: slider
+
+    threshold_high:
+      name: High Threshold (%)
+      description: >
+        Usage above this percentage → red text color.
+      default: 80
+      selector:
+        number:
+          min: 1
+          max: 99
+          step: 1
+          mode: slider
+
+    scroll_speed:
+      name: Scroll speed
+      description: Modifies the scroll speed. Enter a percentage value of the original scroll speed.
+      default: 100
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 10
+          unit_of_measurement: "%"
+          mode: slider
+
+    duration:
+      name: Duration (in seconds)
+      description: Sets how long the app should be displayed, unit is seconds (converted to milliseconds for AWTRIX NG).
+      default: 5
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 1
+          unit_of_measurement: "s"
+          mode: slider
+      
+    text_case:
+      name: Text Case
+      description: Select how you would like your text to display.
+      selector:
+        select:
+          options:
+            - label: Use global setting
+              value: "0"
+            - label: Force Uppercase
+              value: "1"
+            - label: Show as you entered it
+              value: "2"
+          mode: dropdown
+          custom_value: false
+          multiple: false
+          sort: false
+      default: "0"
+      
+    push_icon:
+      name: Icon Mode
+      description: >
+        Please select the icon behaviour (AWTRIX NG's iconMode setting):
+          - `0`  Icon doesn't move (fixed)
+          
+          - `1`  Icon moves with text and will not appear again (pushOnce)
+          
+          - `2` Icon moves with text but appears again when the text starts to scroll again (push)
+      selector:
+        select:
+          options:
+            - label: Icon doesn't move (default)
+              value: "0"
+            - label: Icon moves with text and will not appear again
+              value: "1"
+            - label: Icon moves with text but appears again when the text starts to scroll again
+              value: "2"
+      default: "0"
+
+triggers:
+  - trigger: homeassistant
+    event: start
+  - trigger: state
+    entity_id: !input usage_sensor
+    for:
+      seconds: 5
+    
+variables:
+  v_device_id: !input awtrix
+  v_sensor:    !input usage_sensor
+  v_suffix:    !input suffix_text
+  # AWTRIX NG publishes its own MQTT prefix as a sensor entity ("MQTT prefix").
+  # We read that first, since it's the value every cmd/state topic actually starts with,
+  # and only fall back to the device name if that sensor isn't available yet.
+  v_prefix: >-
+    {% set e = device_entities(v_device_id) | select('search', 'mqtt_prefix') | list %}
+    {% set prefix_state = states(e[0]) if e else 'unavailable' %}
+    {{ prefix_state if prefix_state not in ['unknown', 'unavailable', 'none'] else
+       iif( device_attr(v_device_id, 'name_by_user') != none, device_attr(v_device_id, 'name_by_user'), device_attr(v_device_id, 'name') ) }}
+  v_app:     !input app_name
+  v_icon:      !input icon_id
+  v_color:     !input base_color
+  v_warn:      !input threshold_warn
+  v_high:      !input threshold_high
+  v_push_icon: !input push_icon
+  v_duration: !input duration
+  v_text_case: !input text_case
+  v_scroll_speed: !input scroll_speed
+
+conditions: []
+
+actions:
+  - action: mqtt.publish
+    alias: "Publish Claude usage to Awtrix NG"
+    data:
+      qos: 0
+      retain: false
+      # AWTRIX NG pushed-app topic: <prefix>/cmd/apps/pushed/<name>
+      # (AWTRIX 3 used <prefix>/custom/<name>)
+      topic: "{{ v_prefix }}/cmd/apps/pushed/{{ v_app }}"
+      payload: >-
+        {% set usage = states(v_sensor) | int(-1) %}
+        {% set ok = usage >= 0 %}
+
+        {% set text_color = 'FF0000' if usage > v_high
+                       else ('FFDE21' if usage > v_warn
+                       else v_color) %}
+
+        {% set text = usage ~ '% ' ~ v_suffix if ok else 'N/A' %}
+
+        {% set icon_mode_map = {'0': 'fixed', '1': 'pushOnce', '2': 'push'} %}
+        {% set text_case_map = {'0': 'inherit', '1': 'upper', '2': 'asTyped'} %}
+
+        {{ {
+          "text": text,
+          "iconMode": icon_mode_map.get(v_push_icon, "fixed"),
+          "durationMs": (v_duration | int) * 1000,
+          "textCase": text_case_map.get(v_text_case, "inherit"),
+          "scroll": {"speed": v_scroll_speed | int},
+          "icon": v_icon,
+          "textColor": text_color,
+          "progress": usage,
+          "progressColor": v_color
+        } | tojson if ok else
+          {
+            "text": "N/A",
+            "icon": v_icon,
+            "textColor": v_color,
+            "progress": 0,
+            "progressColor": v_color,
+            "durationMs": (v_duration | int) * 1000,
+            "scroll": {"speed": v_scroll_speed | int}
+          } | tojson }}
+
+mode: restart
