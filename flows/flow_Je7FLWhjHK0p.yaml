@@ -1,8 +1,8 @@
 blueprint:
-  name: 🏈 AWTRIX NG – NFL Scoreboard
+  name: 🏈 AWTRIX NG – NFL Team Scoreboard
   author: Hank_the_Tank / AWTRIX NG migration
   description: >-
-    # NFL Scoreboard for AWTRIX NG ver. 1.0
+    # NFL Team Scoreboard for AWTRIX NG ver. 1.0
 
     Displays the live score of an NFL game from a HACS Team Tracker sensor.
     The home and away sides use their team colors, while four pixels along the
@@ -58,24 +58,20 @@ blueprint:
       selector:
         entity:
 
+
 triggers:
   - trigger: state
     entity_id: !input team_sensor
+    to: IN
     id: game_state
 
   - trigger: state
     entity_id: !input team_sensor
-    attribute: team_score
-    id: game_update
+    from: IN
+    id: game_state
 
-  - trigger: state
-    entity_id: !input team_sensor
-    attribute: opponent_score
-    id: game_update
-
-  - trigger: state
-    entity_id: !input team_sensor
-    attribute: quarter
+  - trigger: time_pattern
+    minutes: /1
     id: game_update
 
 variables:
@@ -183,21 +179,13 @@ actions:
                             ['line', 3, 0, 3, 7, home_color_2],
                             ['line', 28, 0, 28, 7, away_color_2],
                             ['line', 30, 0, 30, 7, away_color_2],
-                            ['text', 7, 1, home_score, '#FFFFFF'],
-                            ['text', 18, 1, away_score, '#FFFFFF'],
+                            ['text', 7, 1, home_score | string, '#FFFFFF'],
+                            ['text', 18, 1, away_score | string, '#FFFFFF'],
                             ['line', 15, 3, 16, 3, '#FFFFFF']
                           ] + quarter_draw,
                           'durationMs': (message_duration | int) * 1000
                         } | to_json
                       }}
-
-                - action: mqtt.publish
-                  data:
-                    qos: 0
-                    retain: false
-                    topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
-                    payload: >-
-                      {{ {'name': app_name, 'fast': true} | to_json }}
 
           default:
             - action: mqtt.publish
@@ -208,4 +196,6 @@ actions:
                   {{ repeat.item ~ '/cmd/apps/pushed/' ~ app_name }}
                 payload: ""
 
-mode: restart
+  - delay: "00:01:00"
+
+mode: single
