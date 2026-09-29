@@ -1,0 +1,271 @@
+blueprint:
+  name: AWTRIX NG – Now Playing TC002 (52×16)
+  description: >-
+    Displays title, artist and playback progress from a media player as an
+    AWTRIX NG pushed app, laid out for the 52×16 panel of the Ulanzi TC002:
+    icon on the left, title on the top line, artist below it and a
+    progress bar along the bottom row. Long texts scroll. The app is removed
+    when playback stops.
+  domain: automation
+  author: Hank_the_Tank / Claude
+  input:
+    awtrix_mqtt_prefix:
+      name: AWTRIX NG MQTT prefix
+      description: >-
+        Enter the MQTT prefix configured on the AWTRIX NG MQTT page,
+        for example Awtrix_tc002. Do not add a trailing slash.
+      default: awtrixNG
+      selector:
+        text:
+
+    media_player:
+      name: Media Player
+      description: Select the media player whose current track should be displayed.
+      selector:
+        entity:
+          domain: media_player
+
+    icon_id:
+      name: Icon ID
+      description: >-
+        ID of an icon that is already stored on the clock, for example
+        apple-music-2. Important: if the icon is missing on the clock, AWTRIX NG
+        rejects the whole update and nothing is shown. Leave empty for no icon;
+        the text then uses the full width.
+      default: ""
+      selector:
+        text:
+
+    icon_size:
+      name: Icon width
+      description: >-
+        Width reserved for the icon. 8 px for normal 8×8 icons, 16 px for
+        16×16 icons. A smaller icon is centred in the reserved space.
+      default: "8"
+      selector:
+        select:
+          mode: list
+          options:
+            - label: 8 px (8×8 icon)
+              value: "8"
+            - label: 16 px (16×16 icon)
+              value: "16"
+
+    repeat_count:
+      name: Repeat
+      description: >-
+        Number of completed text scrolls before the rotation moves on. Use 0 to
+        rely on the normal app duration.
+      default: 3
+      selector:
+        number:
+          mode: box
+          min: 0
+          max: 100
+          step: 1
+
+    text_effect:
+      name: Title Color Palette
+      description: >-
+        Use a fixed custom title color, a custom two-color gradient, or the
+        built-in AWTRIX NG Party palette.
+      default: custom
+      selector:
+        select:
+          mode: list
+          options:
+            - label: Custom (Color)
+              value: custom
+            - label: Two-Color Gradient
+              value: gradient
+            - label: Party
+              value: rainbow
+
+    text_color:
+      name: Title Color / Gradient Start
+      description: >-
+        Title color in Custom (Color) mode and the first color in Gradient mode.
+      default: [255, 255, 255]
+      selector:
+        color_rgb:
+
+    text_gradient_color:
+      name: Gradient End Color
+      description: Second color used in Two-Color Gradient mode.
+      default: [85, 170, 255]
+      selector:
+        color_rgb:
+
+    text_palette_speed:
+      name: Gradient Movement Speed
+      description: >-
+        Movement speed for Gradient and Party. Use 0 for a static color
+        gradient. Higher values move the palette faster.
+      default: 0.25
+      selector:
+        number:
+          mode: slider
+          min: 0
+          max: 10
+          step: 0.05
+
+    text_palette_span:
+      name: Gradient Width
+      description: >-
+        Number of pixels per palette cycle. Use 0 to stretch one gradient
+        across the complete title.
+      default: 0
+      selector:
+        number:
+          mode: box
+          min: 0
+          max: 128
+          step: 1
+
+    artist_color:
+      name: Artist Color
+      description: Color of the artist line below the title.
+      default: [150, 150, 150]
+      selector:
+        color_rgb:
+
+    progress_color:
+      name: Progress Color
+      description: Color of the filled playback progress bar.
+      default: [85, 170, 255]
+      selector:
+        color_rgb:
+
+    background_color:
+      name: Background Color
+      description: Background color of the whole app.
+      default: [0, 0, 0]
+      selector:
+        color_rgb:
+
+mode: restart
+
+triggers:
+  - trigger: state
+    entity_id: !input media_player
+  - trigger: time_pattern
+    seconds: /5
+
+variables:
+  awtrix_mqtt_prefix: !input awtrix_mqtt_prefix
+  media_player_entity: !input media_player
+  icon_id: !input icon_id
+  icon_size: !input icon_size
+  repeat_count: !input repeat_count
+  text_effect: !input text_effect
+  text_color: !input text_color
+  text_gradient_color: !input text_gradient_color
+  text_palette_speed: !input text_palette_speed
+  text_palette_span: !input text_palette_span
+  artist_color: !input artist_color
+  progress_color: !input progress_color
+  background_color: !input background_color
+
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ is_state(media_player_entity, 'playing') }}"
+        sequence:
+          - variables:
+              text_style: >-
+                {% if text_effect == 'rainbow' %}
+                  {{ {
+                    'textColor': 'palette',
+                    'palette': 'Party',
+                    'paletteSpeed': text_palette_speed | float(0),
+                    'paletteSpan': text_palette_span | int(0)
+                  } }}
+                {% elif text_effect == 'gradient' %}
+                  {{ {
+                    'textColor': 'palette',
+                    'palette': [text_color, text_gradient_color],
+                    'paletteSpeed': text_palette_speed | float(0),
+                    'paletteSpan': text_palette_span | int(0)
+                  } }}
+                {% else %}
+                  {{ {'textColor': text_color} }}
+                {% endif %}
+              progress_percent: |-
+                {% set duration =
+                  state_attr(media_player_entity, 'media_duration') | float(0) %}
+                {% set position =
+                  state_attr(media_player_entity, 'media_position') | float(0) %}
+                {% set updated =
+                  state_attr(media_player_entity, 'media_position_updated_at') %}
+                {% if duration > 0 %}
+                  {% set elapsed =
+                    as_timestamp(now())
+                    - as_timestamp(updated, as_timestamp(now())) %}
+                  {% set current = position + ([elapsed, 0] | max) %}
+                  {% set percentage =
+                    (current / duration * 100) | round(0) | int %}
+                  {{ [[percentage, 0] | max, 100] | min }}
+                {% else %}
+                  0
+                {% endif %}
+
+          - action: mqtt.publish
+            data:
+              evaluate_payload: false
+              qos: 0
+              retain: false
+              topic: "{{ awtrix_mqtt_prefix ~ '/cmd/apps/pushed/NowPlaying' }}"
+              # Layout for 52×16: icon column on the left, then
+              # title (rows 0-7), artist (rows 8-14) and progress bar (row 15).
+              payload: >-
+                {% set icon = icon_id | string | trim %}
+                {% set iw = (icon_size | int(8)) if icon else 0 %}
+                {% set x0 = iw + 1 if iw else 0 %}
+                {% set w = 52 - x0 %}
+                {% set scroll = {'mode': 'loop', 'gap': 12} %}
+                {% set regions = [] %}
+                {% if iw %}
+                  {% set regions = regions + [
+                    {'id': 'icon', 'box': [0, 0, iw, 16], 'icon': icon}
+                  ] %}
+                {% endif %}
+                {% set regions = regions + [
+                  dict({
+                    'id': 'title',
+                    'box': [x0, 0, w, 8],
+                    'text': state_attr(media_player_entity, 'media_title') or '',
+                    'scroll': scroll
+                  }, **text_style),
+                  {
+                    'id': 'artist',
+                    'box': [x0, 8, w, 7],
+                    'text': state_attr(media_player_entity, 'media_artist') or '',
+                    'scroll': scroll,
+                    'color': artist_color
+                  },
+                  {
+                    'id': 'progress',
+                    'box': [x0, 15, w, 1],
+                    'progress': progress_percent | int,
+                    'color': progress_color,
+                    'trackColor': '#303030'
+                  }
+                ] %}
+                {{ {
+                  'repeat': repeat_count | int,
+                  'layout': {
+                    'version': 1,
+                    'backgroundColor': background_color,
+                    'regions': regions
+                  }
+                } | to_json }}
+
+    default:
+      - action: mqtt.publish
+        data:
+          evaluate_payload: false
+          qos: 0
+          retain: false
+          topic: "{{ awtrix_mqtt_prefix ~ '/cmd/apps/pushed/NowPlaying' }}"
+          payload: ""
