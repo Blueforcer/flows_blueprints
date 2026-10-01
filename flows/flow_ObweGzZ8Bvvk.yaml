@@ -1,0 +1,115 @@
+blueprint:
+  name: AWTRIX NG random effect
+  description: >-
+    Show a randomly chosen background effect on your AWTRIX NG display, and
+    switch to another one on a fixed interval. The effect runs as a pushed app
+    in the app loop.
+
+
+    AWTRIX NG port of "Awtrix random effect" by N1c093
+    (https://awtrix.de/flow/9dZKg529OyE2). Effect names:
+    https://blueforcer.github.io/awtrix-ng/reference/visuals/#background-effects
+  domain: automation
+  author: N1c093 (AWTRIX NG port by flaviof)
+  homeassistant:
+    min_version: 2024.11.0
+  input:
+    awtrix_ng:
+      name: AWTRIX NG display
+      description: >-
+        Select the target AWTRIX NG display(s). Each display gets its own
+        random pick.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+              model: AWTRIX NG
+          multiple: true
+    effect_list:
+      name: Effects
+      description: Select the effects to choose from at random.
+      selector:
+        select:
+          options:
+            - BrickBreaker
+            - Checkerboard
+            - ColorWaves
+            - Fade
+            - Fireworks
+            - LookingEyes
+            - Matrix
+            - MovingLine
+            - Pacifica
+            - PingPong
+            - Plasma
+            - PlasmaCloud
+            - Radar
+            - Ripple
+            - Snake
+            - SwirlIn
+            - SwirlOut
+            - TheaterChase
+            - TwinklingStars
+          mode: list
+          multiple: true
+    duration:
+      name: Effect duration
+      description: How long the effect app stays on screen each time the app loop reaches it.
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 999
+          mode: box
+          unit_of_measurement: seconds
+    change_interval:
+      name: Effect change interval
+      description: 'How often (in minutes) a new effect is picked. Must start with "/", for example "/5".'
+      default: "/5"
+      selector:
+        text:
+          suffix: minutes
+    app_name:
+      name: App name
+      description: Name of the pushed app that shows the effect (letters, digits, "_" and "-", up to 32).
+      default: effect
+      selector:
+        text:
+
+mode: queued
+
+variables:
+  devices: !input awtrix_ng
+  effect_list: !input effect_list
+  duration: !input duration
+  app_name: !input app_name
+
+triggers:
+  - trigger: time_pattern
+    minutes: !input change_interval
+
+conditions:
+  - condition: template
+    value_template: "{{ effect_list | count > 0 }}"
+
+actions:
+  - repeat:
+      for_each: "{{ devices if devices is list else [devices] }}"
+      sequence:
+        - variables:
+            prefix: >-
+              {% set e = device_entities(repeat.item) | select('search', 'mqtt_prefix') | list %}
+              {{ states(e[0]) if e else 'unknown' }}
+        - if:
+            - condition: template
+              value_template: "{{ prefix not in ['unknown', 'unavailable', 'none', ''] }}"
+          then:
+            - action: mqtt.publish
+              data:
+                qos: 0
+                retain: false
+                topic: "{{ prefix }}/cmd/apps/pushed/{{ app_name }}"
+                payload: >-
+                  {{ {'effect': effect_list | random,
+                      'durationMs': (duration | float(10) * 1000) | int} | to_json }}
