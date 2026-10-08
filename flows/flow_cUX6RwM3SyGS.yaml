@@ -1,0 +1,185 @@
+alias: "Telegram: AWTRIX Steuerung"
+description: "Steuerung der AWTRIX NG Matrix per interaktivem Telegram-Menü"
+mode: single
+trigger:
+  - platform: event
+    event_type: telegram_command
+  - platform: event
+    event_type: telegram_text
+action:
+  - choose:
+      # --- AN / AUS ---
+      - conditions:
+          - condition: template
+            value_template: "{{ '/an' in (trigger.event.data.get('command') or '') or ' AN' in (trigger.event.data.get('text') or '') }}"
+        sequence:
+          - action: mqtt.publish
+            data:
+              topic: DEIN_PREFIX/cmd/display
+              payload: '{"power": true}'
+          - action: telegram_bot.send_message
+            data:
+              target: '{{ trigger.event.data.user_id }}'
+              message: "💡 <b>Display ist AN</b>"
+              parse_mode: html
+              keyboard: &kb
+                - 🟢 AN, 🔴 AUS
+                - ⏮ Zurück, ⏭ Weiter, 🕒 Uhrzeit
+                - ☀️ Hell, 🌙 Dunkel, 🤖 Auto
+                - ℹ️ Status, 🎉 Party
+                
+      - conditions:
+          - condition: template
+            value_template: "{{ '/aus' in (trigger.event.data.get('command') or '') or ' AUS' in (trigger.event.data.get('text') or '') }}"
+        sequence:
+          - action: mqtt.publish
+            data:
+              topic: DEIN_PREFIX/cmd/display
+              payload: '{"power": false}'
+          - action: telegram_bot.send_message
+            data:
+              target: '{{ trigger.event.data.user_id }}'
+              message: "🌙 <b>Display ist AUS</b>"
+              parse_mode: html
+              keyboard: *kb
+
+      # --- NAVIGATION ---
+      - conditions:
+          - condition: template
+            value_template: "{{ '/next' in (trigger.event.data.get('command') or '') or 'Weiter' in (trigger.event.data.get('text') or '') }}"
+        sequence:
+          - action: mqtt.publish
+            data:
+              topic: DEIN_PREFIX/cmd/apps/next
+              payload: '{}'
+          - action: telegram_bot.send_message
+            data:
+              target: '{{ trigger.event.data.user_id }}'
+              message: "▶️ <b>Nächste App</b>"
+              parse_mode: html
+              keyboard: *kb
+
+      - conditions:
+          - condition: template
+            value_template: "{{ '/prev' in (trigger.event.data.get('command') or '') or 'Zurück' in (trigger.event.data.get('text') or '') }}"
+        sequence:
+          - action: mqtt.publish
+            data:
+              topic: DEIN_PREFIX/cmd/apps/previous
+              payload: '{}'
+          - action: telegram_bot.send_message
+            data:
+              target: '{{ trigger.event.data.user_id }}'
+              message: "◀️ <b>Vorherige App</b>"
+              parse_mode: html
+              keyboard: *kb
+              
+      - conditions:
+          - condition: template
+            value_template: "{{ '/uhrzeit' in (trigger.event.data.get('command') or '') or 'Uhrzeit' in (trigger.event.data.get('text') or '') }}"
+        sequence:
+          - action: mqtt.publish
+            data:
+              topic: DEIN_PREFIX/cmd/apps/switch
+              payload: '{"name": "Time"}'
+          - action: telegram_bot.send_message
+            data:
+              target: '{{ trigger.event.data.user_id }}'
+              message: "🕒 <b>Zeitanzeige aktiviert</b>"
+              parse_mode: html
+              keyboard: *kb
+
+      # --- HELLIGKEIT ---
+      - conditions:
+          - condition: template
+            value_template: "{{ '/hell' in (trigger.event.data.get('command') or '') or 'Hell' in (trigger.event.data.get('text') or '') }}"
+        sequence:
+          - action: mqtt.publish
+            data:
+              topic: DEIN_PREFIX/cmd/settings
+              payload: '{"brightness": 255, "autoBrightness": false}'
+          - action: telegram_bot.send_message
+            data:
+              target: '{{ trigger.event.data.user_id }}'
+              message: "☀️ <b>Helligkeit: MAXIMAL</b>"
+              parse_mode: html
+              keyboard: *kb
+
+      - conditions:
+          - condition: template
+            value_template: "{{ '/dunkel' in (trigger.event.data.get('command') or '') or 'Dunkel' in (trigger.event.data.get('text') or '') }}"
+        sequence:
+          - action: mqtt.publish
+            data:
+              topic: DEIN_PREFIX/cmd/settings
+              payload: '{"brightness": 10, "autoBrightness": false}'
+          - action: telegram_bot.send_message
+            data:
+              target: '{{ trigger.event.data.user_id }}'
+              message: "🌙 <b>Helligkeit: MINIMAL</b>"
+              parse_mode: html
+              keyboard: *kb
+
+      - conditions:
+          - condition: template
+            value_template: "{{ '/auto' in (trigger.event.data.get('command') or '') or 'Auto' in (trigger.event.data.get('text') or '') }}"
+        sequence:
+          - action: mqtt.publish
+            data:
+              topic: DEIN_PREFIX/cmd/settings
+              payload: '{"autoBrightness": true}'
+          - action: telegram_bot.send_message
+            data:
+              target: '{{ trigger.event.data.user_id }}'
+              message: "🤖 <b>Helligkeit: AUTOMATISCH</b>"
+              parse_mode: html
+              keyboard: *kb
+
+      # --- SPECIALS ---
+      - conditions:
+          - condition: template
+            value_template: "{{ '/party' in (trigger.event.data.get('command') or '') or 'Party' in (trigger.event.data.get('text') or '') }}"
+        sequence:
+          - action: mqtt.publish
+            data:
+              topic: DEIN_PREFIX/cmd/notify
+              payload: >-
+                {"effect": "{{ ['Plasma', 'Fireworks', 'Ripple', 'Pacifica', 'ColorWaves', 'TwinklingStars'] | random }}", "durationMs": 10000}
+          - action: telegram_bot.send_message
+            data:
+              target: '{{ trigger.event.data.user_id }}'
+              message: "🎉 <b>Party-Effekt gestartet!</b>"
+              parse_mode: html
+              keyboard: *kb
+
+      - conditions:
+          - condition: template
+            value_template: "{{ '/status' in (trigger.event.data.get('command') or '') or '/start' in (trigger.event.data.get('command') or '') or 'Status' in (trigger.event.data.get('text') or '') }}"
+        sequence:
+          - action: telegram_bot.send_message
+            data:
+              target: '{{ trigger.event.data.user_id }}'
+              message: >-
+                ℹ️ <b>Ulanzi Echtzeit-Status</b>
+
+                🌡️ Temp: {{ states('sensor.DEINE_UHR_temperature') }}°C
+                💧 Feuchtigkeit: {{ states('sensor.DEINE_UHR_humidity') }}%
+                🔋 Akku: {{ states('sensor.DEINE_UHR_battery') }}%
+                📶 WLAN: {{ states('sensor.DEINE_UHR_wifi_signal') }} dBm
+                ☀️ Licht: {{ states('sensor.DEINE_UHR_illuminance') }} Lux
+              parse_mode: html
+              keyboard: *kb
+
+    # --- FREI-TEXT LAUFSCHRIFT ---
+    default:
+      - action: mqtt.publish
+        data:
+          topic: DEIN_PREFIX/cmd/notify
+          payload: >-
+            {"text": "{{ trigger.event.data.get('text', '') | replace('\"', '\\\"') }}", "durationMs": 8000, "wakeup": true}
+      - action: telegram_bot.send_message
+        data:
+          target: '{{ trigger.event.data.user_id }}'
+          message: "📨 <b>Nachricht gesendet!</b>\nWird jetzt auf der Uhr angezeigt."
+          parse_mode: html
+          keyboard: *kb
