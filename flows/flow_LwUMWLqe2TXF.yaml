@@ -1,0 +1,492 @@
+blueprint:
+  name: AWTRIX NG Rain Forecast TC002 (52×16)
+  description: 'Shows an hourly rain forecast on one or more AWTRIX NG displays with
+    a 52×16 panel (Ulanzi TC002), and refreshes it automatically whenever the forecast
+    changes. Uses an AWTRIX NG layout: a 16×16 animated weather icon on the left,
+    the expected total rain (mm) on the top line and a bar or line chart of the coming
+    hours below it. When no rain is expected it shows a text instead. The 16×16 icons
+    are built into this blueprint, so nothing has to be uploaded to the clock first.
+    Built for the AWTRIX NG MQTT API. V1.0'
+  domain: automation
+  author: LeonCB
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    awtrix_displays:
+      name: AWTRIX Displays
+      description: Select the target AWTRIX NG TC002 displays. Needs HA discovery
+        enabled on each device - the blueprint reads its MQTT prefix from the "MQTT
+        prefix" sensor.
+      selector:
+        device:
+          filter:
+          - integration: mqtt
+            manufacturer: Blueforcer
+          multiple: true
+      default: []
+    extra_prefixes:
+      name: Extra MQTT prefixes
+      description: Optional. MQTT topic prefixes of displays that are not in Home
+        Assistant - the mqttPrefix from their MQTT settings, or the 12-character device
+        uid when that field is empty. Commands go to <prefix>/cmd/apps/pushed/rain_forecast.
+      selector:
+        text:
+          multiple: true
+          multiline: false
+      default: []
+    my_sensor:
+      name: Sensor
+      description: Select your Weather Sensor. It must provide an hourly forecast.
+      selector:
+        entity:
+          filter:
+          - domain:
+            - weather
+          multiple: false
+          reorder: false
+    hours:
+      name: Hours
+      description: Number of hours shown in the chart. The chart is 34 pixels wide,
+        so about 12 hours gives clear bars; up to 34 still fits one pixel per hour.
+      selector:
+        number:
+          mode: slider
+          min: 4.0
+          max: 34.0
+          step: 1.0
+      default: 12
+    language:
+      name: Language
+      description: Language used for the "no rain expected" text.
+      selector:
+        select:
+          options:
+          - label: English
+            value: en
+          - label: Danish
+            value: dk
+          - label: Dutch
+            value: nl
+          - label: French
+            value: fr
+          - label: German
+            value: de
+          - label: Italian
+            value: it
+          - label: Polish
+            value: pl
+          - label: Portuguese
+            value: pt
+          - label: Russian
+            value: ru
+          - label: Spanish
+            value: es
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: en
+    my_text:
+      name: Custom Text
+      description: Optional. Overrides the translated "no rain expected" text. Leave
+        empty to use the text for the selected Language.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: ''
+    graph_type:
+      name: Graph Type
+      description: Select bar chart or line chart.
+      selector:
+        select:
+          options:
+          - label: Bar Chart
+            value: bar
+          - label: Line Chart
+            value: line
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: bar
+    show_total:
+      name: Show total
+      description: Show the expected total rain (mm) for the chosen hours above the
+        chart. When off, the chart uses the full height.
+      selector:
+        boolean: {}
+      default: true
+    autoscale:
+      name: Autoscale
+      description: Scales the chart to the highest value. When off, the chart runs
+        from 0 to the "Chart maximum" below, so light and heavy rain look different.
+      selector:
+        boolean: {}
+      default: true
+    chart_max:
+      name: Chart maximum (mm per hour)
+      description: Only used when Autoscale is off.
+      selector:
+        number:
+          mode: box
+          min: 0.5
+          max: 50.0
+          step: 0.5
+          unit_of_measurement: mm
+      default: 5
+    icon_source:
+      name: Icon source
+      description: '"Built-in" sends the 16×16 animated icon for the current weather
+        from this blueprint with every update. "Icons on the clock" uses icons stored
+        on the clock instead, named <prefix><weather state>. Careful: if such an icon
+        is missing, AWTRIX NG refuses the whole update.'
+      selector:
+        select:
+          options:
+          - label: Built-in 16×16 icons
+            value: builtin
+          - label: Icons on the clock
+            value: clock
+          - label: No icon
+            value: none
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: builtin
+    icon_prefix:
+      name: Icon name prefix
+      description: Only for "Icons on the clock". Put in front of the weather state
+        to form the icon ID, e.g. "wx_" gives wx_rainy.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: ''
+    graph_color:
+      name: Graph Color
+      description: Select the Graph color.
+      selector:
+        color_rgb: {}
+      default:
+      - 60
+      - 150
+      - 255
+    text_color:
+      name: Text Color
+      description: Color of the total and of the "no rain" text.
+      selector:
+        color_rgb: {}
+      default:
+      - 255
+      - 255
+      - 255
+    background_color:
+      name: Background Color
+      description: Select the Background color. Ignored when an effect is chosen.
+      selector:
+        color_rgb: {}
+      default:
+      - 0
+      - 0
+      - 0
+    text_case:
+      name: Text Case
+      description: Select how you would like your text to display.
+      selector:
+        select:
+          options:
+          - label: Use global setting
+            value: inherit
+          - label: Force Uppercase
+            value: upper
+          - label: Show as you entered it
+            value: asTyped
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: inherit
+    show_rainbow:
+      name: Rainbow Colors
+      description: Should the text and chart be shown in Rainbow colors?
+      selector:
+        boolean: {}
+      default: false
+    repeat_count:
+      name: Repeat
+      description: How many times a scrolling text runs through its box before the
+        app ends. 0 turns it off and the duration is used instead.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: '2'
+    duration:
+      name: Duration (in seconds)
+      description: Sets how long the app should be displayed. 0 is global app time.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: '0'
+    lifetime:
+      name: Lifetime (in seconds)
+      description: How long the app stays alive before it is removed from the app
+        cycle automatically. 0 is infinite lifetime.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: '0'
+    lifetime_expiry:
+      name: On lifetime expiry
+      description: What happens when the lifetime runs out. "Remove" drops the app
+        from the rotation, "Mark" keeps it and draws a dark red frame around it.
+      selector:
+        select:
+          options:
+          - label: Remove the app
+            value: remove
+          - label: Mark the app as stale
+            value: mark
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: remove
+    switch_to_app:
+      name: Switch to app on value change
+      description: Should the clock switch to the app immediately when the forecast
+        changes?
+      selector:
+        boolean: {}
+      default: false
+    scroll:
+      name: Scroll the text?
+      description: Enables scrolling of texts that don't fit.
+      selector:
+        boolean: {}
+      default: true
+    scrollspeed:
+      name: Scroll Speed Percentage
+      description: Modifies the scrollspeed. You need to enter a percentage value.
+      selector:
+        number:
+          mode: slider
+          min: 0.0
+          max: 200.0
+          step: 1.0
+      default: 100
+    effect:
+      name: Effect
+      description: Select a background effect (optional).
+      selector:
+        select:
+          options:
+          - label: None
+            value: ''
+          - label: BrickBreaker
+            value: BrickBreaker
+          - label: Checkerboard
+            value: Checkerboard
+          - label: ColorWaves
+            value: ColorWaves
+          - label: Fade
+            value: Fade
+          - label: Fireworks
+            value: Fireworks
+          - label: LookingEyes
+            value: LookingEyes
+          - label: Matrix
+            value: Matrix
+          - label: MovingLine
+            value: MovingLine
+          - label: PingPong
+            value: PingPong
+          - label: Pacifica
+            value: Pacifica
+          - label: Plasma
+            value: Plasma
+          - label: PlasmaCloud
+            value: PlasmaCloud
+          - label: Radar
+            value: Radar
+          - label: Ripple
+            value: Ripple
+          - label: Snake
+            value: Snake
+          - label: SwirlIn
+            value: SwirlIn
+          - label: SwirlOut
+            value: SwirlOut
+          - label: TheaterChase
+            value: TheaterChase
+          - label: TwinklingStars
+            value: TwinklingStars
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: ''
+    overlay:
+      name: Weather Overlay
+      description: Optional AWTRIX NG weather overlay drawn on top of the app. "Follow
+        device setting" leaves the global overlay in charge.
+      selector:
+        select:
+          options:
+          - label: Follow device setting
+            value: ''
+          - label: Drizzle
+            value: drizzle
+          - label: Frost
+            value: frost
+          - label: Rain
+            value: rain
+          - label: Snow
+            value: snow
+          - label: Storm
+            value: storm
+          - label: Thunder
+            value: thunder
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: ''
+mode: queued
+triggers:
+- trigger: homeassistant
+  event: start
+- trigger: state
+  entity_id: !input my_sensor
+  for:
+    seconds: 2
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  my_sensor: !input my_sensor
+  hours: !input hours
+  v_language: !input language
+  my_custom_text: !input my_text
+  graph_type: !input graph_type
+  show_total: !input show_total
+  autoscale: !input autoscale
+  chart_max: !input chart_max
+  icon_source: !input icon_source
+  icon_prefix: !input icon_prefix
+  graph_color: !input graph_color
+  text_color: !input text_color
+  background_color: !input background_color
+  text_case: !input text_case
+  show_rainbow: !input show_rainbow
+  my_repeat: !input repeat_count
+  my_duration: !input duration
+  my_lifetime: !input lifetime
+  lifetime_expiry: !input lifetime_expiry
+  switch_to_app: !input switch_to_app
+  scrolling: !input scroll
+  scroll_speed: !input scrollspeed
+  effect: !input effect
+  overlay: !input overlay
+  app_name: rain_forecast
+  targets: "{% set ns = namespace(t=[]) %} {% for device_id in device_ids %}\n  {%
+    set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list
+    %}\n  {% if found %}\n    {% set ns.t = ns.t + [states(found[0])] %}\n  {% endif
+    %}\n{% endfor %} {% set ns.t = ns.t + (extra_prefixes | list) %} {{ ns.t | map('trim')
+    | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}"
+  builtin_icons:
+    clear-night: R0lGODlhEAAQAIIAAP//yP/wqr6+jMi5eJaWbgAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEKAAAACwAAAAAEAAQAAAIPwALCBxIsKDBAgIOKjxIYGFBAgAaEhwwgGFBig4HUgyQUeCAABw7fgQpEmRIhxtJZkwJEqNCijArJuxIs2bHgAAh+QQEKAAAACwGAAEACgAMAIL//8j/8Kq+vozIuXiWlm4AAAAAAAAAAAAIJAALCBxIsKBBgwIOKlzIsGFBAgoJACAQ4CDEABgHDCioUaPBgAAh+QQEKAAAACwFAAAACwAOAIL//8j/8Kq+vozIuXiWlm4AAAAAAAAAAAAIMgALEChAsGBBAgAGGjSocKHDhwMeSpxIcWIAihcfCigQIOPDjh0HDGhYQKRJhCQXkgwIADs=
+    cloudy: R0lGODlhEAAQAIIAAOvw9b7I0pabqniCkWlufUFGVQAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQERgAAACwAAAAAEAAQAAAIUAANCBxIsKDBgwgJCliY0MBCAgsjHhRAoKLFigwLFtjIkWNCACAbCgRJEmHIAChRAjAQcqTKlCkBqGQJs2ZNAwNs6hwgcIDPn0B/ihxKlGhAACH5BASMAAAALAAAAgAQAAsAguvw9b7I0pabqniCkWlufUFGVQAAAAAAAAhLAA0IHDhQgEGCCA0YJGCwYUKFBCJKjHgQYYGLGDE+BMDxIUKOID12DECSJAADHQUCMFmy5MoAJ1+2nFnSwACaOAcIHMCzp8+eAgMCACH5BARGAAAALAAAAgAQAAsAguvw9b7I0pabqniCkWlufUFGVQAAAAAAAAhKAA0IHChQgEGCCA0YJGCwYUKFBCJKjHgQYYGLGDE+FAig40aCHUNu9BigZEkABjxyPGnSJICTKVvKlGlgwMybAwQO2MmzJ08DAQEAOw==
+    exceptional: R0lGODlhEAAQAIEAAP////8oHgAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEMgAAACwAAAAAEAAQAAAIRgAFCBxIsKDBgwgHBgiQsODChgoFMoQ4cWJChgAACLB4EKNGjg4FZpTYceLIjSA3DjypkmBKlzBXaoxIkiLKhThz6oRYMCAAIfkEBDIAAAAsAAACABAADQCB////lhQPAAAAAAAACEIABQgcKCBAAIIIERpMyPBgQYYKBTqE+BAAgIcUD1rE2FDgRo4EFwr4KDLkwI8gU0YcOHHkRZYwKUosaLCmzZsBAgIAOw==
+    fog: R0lGODlhEAAQAIEAAKqvuW5zfQAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEGQAAACwAAAAAEAAQAAAINQAFCBxIsKDBgwgTEgTAkKGAhg4dKpxIMUAAARYzYsx4kaJHhBAfhmz4sWTBixxRcjTJkmVAACH5BAQZAAAALAEAAwAOAAoAgaqvuW5zfQAAAAAAAAgtAAEIBCBgoMCCBwUoXMiwoUOHAQQEmDhRIsWIDzNqZDgQYUeDG0NmvBiRpMSAACH5BAQZAAAALAEAAwAOAAoAgaqvuW5zfQAAAAAAAAgrAAEIFCCwIEGDAhIqXMiwocMAECEKiCgxgMOLGBcOLLiRY8aPDylOFAkxIAAh+QQEGQAAACwBAAMADgAKAIGqr7luc30AAAAAAAAILAABABAgsCDBggMFKFzIsKFDhwEiRhQgceLEhxgzLhyIkCNCjSAxVqQ4UmJAACH5BAQZAAAALAEAAwAOAAoAgaqvuW5zfQAAAAAAAAgtAAEIAECQ4MCCAgUoXMiwocOHASIGECAxIkWLDzNqZIhQYMeBG0NCtFhxYsWAACH5BAQZAAAALAEAAwAOAAoAgaqvuW5zfQAAAAAAAAgtAAUAGDhQIEEAAgUoXMiwocOHASIKiEhxYsWHGDMuPIiQo0GNICEGsFiRYsSAADs=
+    hail: R0lGODlhEAAQAIIAAP///8jc8JabqmlufUFGVQAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEDAAAACwAAAAAEAAQAAAIRQALCBxIsKDBAgISHiyYsOFChQ0dKhQYcUDEhBYFILzIEWMBAgNCihwpkoBAAihTqky5sGVBAAFcypz5MibNmTBv6mwZEAAh+QQEDAAAACwEAAkACgAGAIL////I3PCWm6ppbn1BRlUAAAAAAAAAAAAIFQALCBxIEEAAgggTKix4cCFCgwQDAgAh+QQEDAAAACwEAAoACgAGAIL////I3PCWm6ppbn1BRlUAAAAAAAAAAAAIFQALCBxIEEAAgggTKix4cCFCgwQDAgAh+QQEDAAAACwEAAkACgAHAIL////I3PCWm6ppbn1BRlUAAAAAAAAAAAAIFgALCCwAIMDAgwgTJiyosKFDgQwdBgQAIfkEBAwAAAAsBAAJAAoABwCC////yNzwlpuqaW59QUZVAAAAAAAAAAAACBUACwgcSJAggAAFEypMeHChQ4cHAwIAIfkEBAwAAAAsBAAJAAoABwCC////yNzwlpuqaW59QUZVAAAAAAAAAAAACBYACwgcKBBAAIIIERpMyLDhwIUOGwYEACH5BAQMAAAALAQACQAKAAcAgv///8jc8JabqmlufUFGVQAAAAAAAAAAAAgWAAsIHEiw4EAAAQwqLIBwoUOFDRUGBAA7
+    lightning: R0lGODlhEAAQAIIAAP/mKJabqmlufUFGVQAAAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEDgAAACwAAAAAEAAQAAAITAAJCBxIsKBBAgESHiyYsOFChQ0dKhQYUUDEhBYDILzIESOBAQJCihwpcoDAAShTqky5cCAAAC0Jvozp8iVMmgJv4tRJk2dMnzgXBgQAIfkEBA4AAAAsBgAIAAUABwCBlpuqaW59QUZVAAAACAwABwgcSLCgwYMHAwIAIfkEBA4AAAAsAAABAA8ADgCC0tLm/+YoaW59QUZVAAAAAAAAAAAAAAAACEYACQgcCKDgwIMHCypEKNCgwoUGCTwU8LAgxYoYJw4QwLGjx44DCAwYSbIkSYYHAwRAiVAly5QqV74cKHMmgZozcb7UOTAgACH5BAQcAAAALAAAAQAPAA4AgZabqmlufUFGVQAAAAg6AAcIHAig4MCDBwsqRCjQoMKFBgc8DPCwIMWKGCcKCMCxo8eOAgYIGEmyJEmGKFOqXMmypcuXMAcEBAA7
+    lightning-rainy: R0lGODlhEAAQAIIAAP/mKJabqmlufSiM/0FGVQAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEDQAAACwAAAAAEAAQAAAIUQALCBxIsKDBAgESHiyYsOFChQ0dKhQYUUDEhBYDILzIEWMBAgJCihwpkoBAAihTqky5cCAAAAsHEHzZcuZLmDVdEpS5EGfOAj4L8DwY9GfLgAAh+QQEDQAAACwDAAgADAAHAIKWm6ppbn0ojP9BRlUAAAAAAAAAAAAAAAAIFQAJCBxIsKDBgQIOKlzIMCHDhgIDAgAh+QQEDQAAACwDAAoADAAGAIKWm6ppbn0ojP9BRlUAAAAAAAAAAAAAAAAIFQAJCBxIUKCAgggTKlR4cKFDAg0DAgAh+QQEDQAAACwDAAgADAAIAIL/5iiWm6ppbn0ojP9BRlUAAAAAAAAAAAAIIgALCBwIAMDAgwILChyAsEBBhQ0JImQoMWJCixcbUsRYICAAIfkEBA0AAAAsAwAIAAwACACClpuqaW59KIz/QUZVAAAAAAAAAAAAAAAACBYACQgcSLCgwYMFBSBcuFAhw4cQBQQEACH5BAQNAAAALAMACQAMAAcAgpabqmlufSiM/0FGVQAAAAAAAAAAAAAAAAgWAAkIHEiQgICCCBMOPKiwoUKGDiMGBAAh+QQEDQAAACwDAAkADAAHAIKWm6ppbn0ojP9BRlUAAAAAAAAAAAAAAAAIFQAJCBxIsKBBgQIOKjSYcKFDhg8DAgA7
+    partlycloudy: R0lGODlhEAAQAIIAAOvw9b7I0v/IAP+qAP+MAHiCkQAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEPAAAACwAAAAAEAAQAAAIWAANCBxIsKDBAQYPKkwokIBDAgwHEhBAUQDEiBMrXlSYkSJEhAk7WozY0CGAkwxBGgAQoCUAhihbynyJUiDLADdl4nS5UqdPnwYK/BxaQGCBo0iTIiWZMCAAIfkEBDwAAAAsAQABAAoACQCC6/D1vsjS/8gA/6oA/4wAeIKRAAAAAAAACDIADQgcMFCgwYMIBRJYSMAgQQICIgpoSNAARIkNDV6MmPGhxIkGKlpcCKBkQgABUgIICAA7
+    pouring: R0lGODlhEAAQAIIAAJabqmlufSiM/0FGVQAAAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQECQAAACwAAAAAEAAQAAAITAAJCBxIsKBBAgASHiyYsOFChQ0dKhQYMUDEhBYBILzIESOBAQFCihwpcoDAAShTqky5sCVBAQthwmw5k6bLmzUF5jS4s2BPnzcJBAQAIfkEBAkAAAAsAQAJAA4ABwCClpuqaW59KIz/QUZVAAAAAAAAAAAAAAAACB8ACQgUKGCgwYEFDxIkkPBgQ4UMIUpEaPChQosLIQYEACH5BAQJAAAALAAACQAPAAcAgpabqmlufSiM/0FGVQAAAAAAAAAAAAAAAAgeAAkIHDhQAMGDAg0iLLiQgEGFCyFGbEiRocWGEAMCACH5BAQJAAAALAAACQAPAAcAgpabqmlufSiM/0FGVQAAAAAAAAAAAAAAAAgfAAkIFCCwoEECBA8WTKhwYEODDA8SjAjx4UKLGCkGBAAh+QQECQAAACwBAAkADgAHAIKWm6ppbn0ojP9BRlUAAAAAAAAAAAAAAAAIHgAJCBxIkIAAggcLIlRokOHAhAwhFjwocaHDigoDAgAh+QQECQAAACwBAAkADgAHAIKWm6ppbn0ojP9BRlUAAAAAAAAAAAAAAAAIHgAJCBQoYKDBgwgJFCSYcOBChA8hNmSYsGBEhw0DAgAh+QQECQAAACwAAAkADgAHAIKWm6ppbn0ojP9BRlUAAAAAAAAAAAAAAAAIHgAJCBw4UADBgwQMIlxIUKFAhwshFmT4kKLEiQoDAgA7
+    rainy: R0lGODlhEAAQAIIAAOvw9b7I0iiM/3iCkRRGjAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQECwAAACwAAAAAEAAQAAAISAALCBxIsKDBAgASHiyYsOFChQ0dKhQYMUDEhBYBILzIEWOBAQFCihwpcoDAAShTqky5sGVBAS5jCiQgcyBMlzRrFrips+fCgAAh+QQECwAAACwEAAkACQAHAILr8PW+yNIojP94gpEURowAAAAAAAAAAAAIGAALCBw4kABBggIOKjxocGHCggsLPBQYEAAh+QQECwAAACwEAAkACQAHAILr8PW+yNIojP94gpEURowAAAAAAAAAAAAIGAALCCxAYKDBAgIOKhRYcGHChRAbKhQQEAAh+QQECwAAACwEAAkACQAHAILr8PW+yNIojP94gpEURowAAAAAAAAAAAAIGAALCBwokABBggIIGjwoMCFDhgsZOmQYEAAh+QQECwAAACwEAAkACQAHAILr8PW+yNIojP94gpEURowAAAAAAAAAAAAIGAAJFBhIcKCAgggTFhCo8CBBhgkdKiwYEAAh+QQECwAAACwEAAkACQAGAILr8PW+yNIojP94gpEURowAAAAAAAAAAAAIFgALCCwgYKDBgwUIIBRYcGHDhQsFBAQAIfkEBAsAAAAsBAAJAAkABgCC6/D1vsjSKIz/eIKRFEaMAAAAAAAAAAAACBYACwgcKFAAQQIECRpMyLAAwoYLGQYEADs=
+    snowy: R0lGODlhEAAQAIIAAP///+vw9b7I0niCkQAAAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEFwAAACwAAAAAEAAQAAAIRQAJCBxIsKBBAgESHiyYsOFChQ0dKhQYUUDEhBYDILzIESOBAQJCihwpcoDAAShTqky5sCVBAC5jyjwIc6bMmjZz0iQQEAAh+QQEFwAAACwDAAkADAAHAIL////r8PW+yNJ4gpEAAAAAAAAAAAAAAAAIFwAJCBxIkAAAgwUTKlxI8CBDhg4fKgwIACH5BAQXAAAALAQACQAMAAcAgv///+vw9b7I0niCkQAAAAAAAAAAAAAAAAgXAAkIHEiwoEGBAAAcXMjQoMKGCx8aDAgAIfkEBBcAAAAsAwAJAA0ABwCC////6/D1vsjSeIKRAAAAAAAAAAAAAAAACBgACQgkAGCgwYMIEyoEUFChw4cHG0I0GBAAIfkEBBcAAAAsAwAJAA0ABwCC////6/D1vsjSeIKRAAAAAAAAAAAAAAAACBgACQgcSLDgQAAGEypcSAAhQoYQIT4UGBAAIfkEBBcAAAAsAwAJAAwABwCC////6/D1vsjSeIKRAAAAAAAAAAAAAAAACBcACQgcKBAAwYMIDxpMyLAhQQALHUoMCAAh+QQEFwAAACwDAAkADAAHAIL////r8PW+yNJ4gpEAAAAAAAAAAAAAAAAIFwAJCBxIsKBBAAYTFkSosKFDgQAYNgwIADs=
+    snowy-rainy: R0lGODlhEAAQAIIAAP///+vw9b7I0niCkSiM/wAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEEgAAACwAAAAAEAAQAAAIRgALCBxIsKDBAgESHiyYsOFChQ0dKhQYUUDEhBYDILzIEWOBAQJCihwpcoDAAShTqky5sCVBAC5jynw5s2YBAjZzGsQpMCAAIfkEBBIAAAAsAwAJAAoABwCC////6/D1vsjSeIKRKIz/AAAAAAAAAAAACBYACwgcOJAAAIIIEyoceHChQgIOFQYEACH5BAQSAAAALAMACQAKAAcAgv///+vw9b7I0niCkSiM/wAAAAAAAAAAAAgWAAsIHEiwIEECAAwqXEgwIUODBAwGBAAh+QQEEgAAACwDAAkACgAHAIL////r8PW+yNJ4gpEojP8AAAAAAAAAAAAIFwALCCQgsKDBgwgPEgCQsKHDAgwfCgwIACH5BAQSAAAALAMACQAKAAcAgv///+vw9b7I0niCkSiM/wAAAAAAAAAAAAgWAAsIHEhwIIGCCBMmJABAoUOFDQUGBAAh+QQEEgAAACwDAAkACgAHAIL////r8PW+yNJ4gpEojP8AAAAAAAAAAAAIFQALCBwIYKDBgwYJIFzIMGHBhg0DAgAh+QQEEgAAACwDAAkACgAHAIL////r8PW+yNJ4gpEojP8AAAAAAAAAAAAIFgALCBxIsGABAAYTDiSgsKFCAggVBgQAOw==
+    sunny: R0lGODlhEAAQAIEAAP/IAP+qAP+MAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEMgAAACwAAAAAEAAQAAAISgAHCBxIsKDBgwgHCkgocKHAAAQdFoQ4QIBDigctapSYEYBHABwLWvwIMmTFACM/WhyA0qAAkiYjboz5sOHFjAhpDsTIsGHPnwEBACH5BAQyAAAALAIAAgANAA0Agf/IAP+qAP+MAAAAAAhBAAcIFCBwYMGDAwIIVIjwoACCCCE+nChx4QABADICIMhwIEaNDyN+zBiyoMKRGxMavEixosiGBxl2jOgQpk2BAQEAOw==
+    windy: R0lGODlhEAAQAIEAALTc/26g3AAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEDAAAACwAAAAAEAAQAAAIMAAFCBxIsKDBgwgTKjQIAIDAhhAdRpS4sKLFiwEyahSgcePFjyAZRhQw8mPDkCEDAgAh+QQEDAAAACwAAAQACQAJAIG03P9uoNwAAAAAAAAIHQAFCABAsKDAgwgTKlwoIEDDABAhMpxI8WBBgwEBACH5BAQMAAAALAEABAAJAAkAgbTc/26g3AAAAAAAAAgdAAEIAECwoICDCBMqXMgwgIAAECMynEhxYUGDAQEAIfkEBAwAAAAsAgAEAAkACQCBtNz/bqDcAAAAAAAACB4AAQgAQLCggIMIEypcyDCAgAAQIzKcSDGhwIIGAwIAIfkEBAwAAAAsAwAEAAkACQCBtNz/bqDcAAAAAAAACB4AAQgAQLCggIMIEypcyDCAgAAQIzKcSDGhwIIGAwIAIfkEBAwAAAAsBAAEAAkACQCBtNz/bqDcAAAAAAAACB4AAQgAQLCggIMIEypcyDCAgAAQIzKcSDGhwIIGAwIAIfkEBAwAAAAsBQAEAAkACQCBtNz/bqDcAAAAAAAACB8AAQgAQLCggIMIEypcyDCAgAAQIzKcSDGhwIIEDwYEADs=
+    windy-variant: R0lGODlhEAAQAIIAAOvw9bTc/77I0m6g3HiCkQAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEDQAAACwAAAAAEAAQAAAIPwALCBxIsKDBAgASHhyYUEDChwcBCJhIcaLCggQyatS4sKPHjyBDihwYIADJkiULoEw5suXBATALwJwp06XLgAAh+QQEDQAAACwBAAoADQAEAILr8PW03P++yNJuoNx4gpEAAAAAAAAAAAAIGgALBBg4UCDBAggTKlzIsCHCARAHFIgIsUBAACH5BAQNAAAALAEACgANAAQAguvw9bTc/77I0m6g3HiCkQAAAAAAAAAAAAgaAAMUCECQ4ECDBRIqXMiwocMCAyJGhChxQEAAIfkEBA0AAAAsAgAKAAgABACC6/D1tNz/vsjSbqDceIKRAAAAAAAAAAAACBQAAxQIQJBggYMIEypMOKBhwwIBAQAh+QQEDQAAACwDAAoACAAEAILr8PW03P++yNJuoNx4gpEAAAAAAAAAAAAIFgADFAhAkGCBgwgTKjw4oMCAhw8LBAQAIfkEBA0AAAAsBAAKAAgABACC6/D1tNz/vsjSbqDceIKRAAAAAAAAAAAACBYAAxQIQJBggYMIEyo8OKDAgIcPCwQEADs=
+conditions:
+- condition: not
+  conditions:
+  - condition: state
+    entity_id: !input my_sensor
+    state:
+    - unavailable
+    - unknown
+actions:
+- action: weather.get_forecasts
+  data:
+    type: hourly
+  response_variable: my_forecast
+  target:
+    entity_id: !input my_sensor
+  continue_on_error: true
+- variables:
+    rain_tenths: "{% set f = (my_forecast[my_sensor].forecast\n            if my_forecast
+      is defined and my_sensor in my_forecast\n            else state_attr(my_sensor,
+      'forecast')) or [] %}\n{{ f[:hours | int(12)] | map(attribute='precipitation')\n
+      \  | map('float', 0) | map('multiply', 10) | map('round', 0) | map('int') |
+      list }}"
+    no_rain_text: "{% set no_rain_by_lang = {\n  'en': 'No rain expected', 'dk': 'Ingen
+      regn forventet',\n  'nl': 'Geen regen verwacht', 'de': 'Kein Regen erwartet',\n
+      \ 'fr': 'Pas de pluie prévue', 'es': 'No se espera lluvia',\n  'it': 'Nessuna
+      pioggia prevista', 'pl': 'Brak opadów deszczu',\n  'pt': 'Sem previsão de chuva',
+      'ru': 'Дождь не ожидается'\n} %} {{ my_custom_text if my_custom_text | trim
+      != '' else\n   no_rain_by_lang.get(v_language, no_rain_by_lang['en']) }}"
+    icon_value: "{% set s = states(my_sensor) %} {% if icon_source == 'builtin' %}\n
+      \ {{ 'data:image/gif;base64,' ~ builtin_icons.get(s, builtin_icons['exceptional'])
+      }}\n{% elif icon_source == 'clock' %}\n  {{ (icon_prefix | default('', true)
+      | trim) ~ s }}\n{% endif %}"
+    app_payload: "{% set data = rain_tenths | from_json if rain_tenths is string else
+      rain_tenths %} {% set icon = icon_value | trim %} {% set x0 = 18 if icon else
+      0 %} {% set w = 52 - x0 %} {% set scroll = {'mode': 'loop', 'gap': 12, 'speed':
+      scroll_speed | int(100)}\n                if scrolling else 'static' %}\n{%
+      set c_text = {'textColor': 'palette', 'palette': 'Rainbow'} if show_rainbow\n
+      \               else {'color': text_color} %}\n{% set c_chart = {'color': 'palette',
+      'palette': 'Rainbow'} if show_rainbow\n                 else {'color': graph_color}
+      %}\n{% set ns = namespace(r=[]) %} {% if icon %}\n  {% set ns.r = ns.r + [{'id':
+      'icon', 'box': [0, 0, 16, 16], 'icon': icon}] %}\n{% endif %} {% if (data |
+      sum) > 0 %}\n  {% set chart = {'values': data, 'type': graph_type} %}\n  {%
+      if not autoscale %}\n    {% set chart = dict(chart, min=0, max=[(chart_max |
+      float(5) * 10) | round(0) | int, 1] | max) %}\n  {% endif %}\n  {% if show_total
+      %}\n    {% set total = '%.1f' | format((data | sum) / 10) ~ ' mm' %}\n    {%
+      set ns.r = ns.r + [\n      dict({'id': 'total', 'box': [x0, 0, w, 7], 'text':
+      total,\n            'scroll': scroll, 'textCase': 'asTyped'}, **c_text),\n      dict({'id':
+      'chart', 'box': [x0, 7, w, 9], 'chart': chart}, **c_chart)\n    ] %}\n  {% else
+      %}\n    {% set ns.r = ns.r + [\n      dict({'id': 'chart', 'box': [x0, 0, w,
+      16], 'chart': chart}, **c_chart)\n    ] %}\n  {% endif %}\n{% else %}\n  {%
+      set ns.r = ns.r + [\n    dict({'id': 'norain', 'box': [x0, 0, w, 16], 'text':
+      no_rain_text | trim,\n          'scroll': scroll, 'textCase': text_case}, **c_text)\n
+      \ ] %}\n{% endif %} {% set layout = {'version': 1, 'regions': ns.r} %} {% if
+      effect %}\n  {% set layout = dict(layout, effect=effect) %}\n{% else %}\n  {%
+      set layout = dict(layout, backgroundColor=background_color) %}\n{% endif %}
+      {% if overlay %}\n  {% set layout = dict(layout, overlay=overlay) %}\n{% endif
+      %} {{ {\n     'repeat': my_repeat | int(0),\n     'durationMs': (my_duration
+      | int(0)) * 1000,\n     'lifetimeMs': (my_lifetime | int(0)) * 1000,\n     'lifetimeExpiry':
+      lifetime_expiry,\n     'layout': layout\n   } | tojson }}"
+- repeat:
+    for_each: '{{ targets }}'
+    sequence:
+    - action: mqtt.publish
+      data:
+        qos: 0
+        retain: false
+        evaluate_payload: false
+        topic: '{{ repeat.item ~ ''/cmd/apps/pushed/'' ~ app_name }}'
+        payload: '{{ app_payload }}'
+    - condition: template
+      value_template: '{{ switch_to_app == true }}'
+    - action: mqtt.publish
+      data:
+        qos: 0
+        retain: false
+        topic: '{{ repeat.item ~ ''/cmd/apps/switch'' }}'
+        payload: '{{ app_name }}'
