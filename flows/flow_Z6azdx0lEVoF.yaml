@@ -1,0 +1,452 @@
+blueprint:
+  name: AWTRIX NG Claude Usage TC002 (52×16)
+  description: 'Displays your Claude usage on one or more AWTRIX NG displays with
+    a 52×16 panel (Ulanzi TC002). Uses an AWTRIX NG layout: an icon stored on the
+    clock on the left, a label on the top line, the usage percentage (color-coded
+    by thresholds) plus the time until the next reset on the second line, and a progress
+    bar along the bottom. Built for the AWTRIX NG MQTT API. V1.2'
+  domain: automation
+  author: LeonCB
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    awtrix_displays:
+      name: AWTRIX Displays
+      description: Select the target AWTRIX NG TC002 displays. Needs HA discovery
+        enabled on each device - the blueprint reads its MQTT prefix from the "MQTT
+        prefix" sensor.
+      selector:
+        device:
+          filter:
+          - integration: mqtt
+            manufacturer: Blueforcer
+          multiple: true
+      default: []
+    extra_prefixes:
+      name: Extra MQTT prefixes
+      description: Optional. MQTT topic prefixes of displays that are not in Home
+        Assistant - the mqttPrefix from their MQTT settings, or the 12-character device
+        uid when that field is empty.
+      selector:
+        text:
+          multiple: true
+          multiline: false
+      default: []
+    usage_sensor:
+      name: Claude Usage Sensor
+      description: Sensor that provides your Claude (weekly or session) usage as a
+        percentage (0–100), e.g. via https://github.com/trickv/hass-claude-usage
+      selector:
+        entity:
+          filter:
+          - domain:
+            - sensor
+          multiple: false
+          reorder: false
+    reset_sensor:
+      name: Reset Time Sensor
+      description: Optional. Timestamp sensor with the moment the usage resets (e.g.
+        "Session Reset Time" or "Weekly Reset Time"). When set, the time left until
+        the reset is shown next to the percentage and refreshed every minute.
+      selector:
+        entity:
+          filter:
+          - domain:
+            - sensor
+            device_class:
+            - timestamp
+          multiple: false
+          reorder: false
+      default: ''
+    app_name:
+      name: AWTRIX Application name
+      description: The app name used in the MQTT topic - it should be unique and match
+        [A-Za-z0-9_-]{1,32}
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: claude_usage
+    label_text:
+      name: Label
+      description: Text on the top line (e.g. "Sessie" or "Week"). Leave empty to
+        show only the percentage, centred in the full height.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: Claude
+    language:
+      name: Language
+      description: Language used for the fallback text and the time-left units.
+      selector:
+        select:
+          options:
+          - label: English
+            value: en
+          - label: Danish
+            value: dk
+          - label: Dutch
+            value: nl
+          - label: French
+            value: fr
+          - label: German
+            value: de
+          - label: Italian
+            value: it
+          - label: Polish
+            value: pl
+          - label: Portuguese
+            value: pt
+          - label: Russian
+            value: ru
+          - label: Spanish
+            value: es
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: en
+    threshold_warn:
+      name: Warning Threshold (%)
+      description: Usage above this percentage → yellow percentage and progress bar.
+      default: 50
+      selector:
+        number:
+          min: 1.0
+          max: 99.0
+          step: 1.0
+          mode: slider
+    threshold_high:
+      name: High Threshold (%)
+      description: Usage above this percentage → red percentage and progress bar.
+      default: 80
+      selector:
+        number:
+          min: 1.0
+          max: 99.0
+          step: 1.0
+          mode: slider
+    icon_id:
+      name: Icon ID on the clock
+      description: ID of an icon stored on the clock (the file name without extension).
+        AWTRIX NG refuses the whole update when the icon is missing. Leave empty for
+        no icon; the text then uses the full width.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: claude
+    text_case:
+      name: Text Case
+      description: Select how you would like your text to display.
+      selector:
+        select:
+          options:
+          - label: Use global setting
+            value: inherit
+          - label: Force Uppercase
+            value: upper
+          - label: Show as you entered it
+            value: asTyped
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: inherit
+    background_color:
+      name: Background Color
+      description: Select the Background color. Ignored when an effect is chosen.
+      selector:
+        color_rgb: {}
+      default:
+      - 0
+      - 0
+      - 0
+    label_color:
+      name: Label Color
+      description: Color of the label on the top line.
+      selector:
+        color_rgb: {}
+      default:
+      - 255
+      - 255
+      - 255
+    text_color:
+      name: Usage & Progress Color
+      description: Color of the percentage and progress bar while usage is below the
+        Warning Threshold (Claude brand color by default).
+      selector:
+        color_rgb: {}
+      default:
+      - 222
+      - 115
+      - 86
+    reset_color:
+      name: Time Left Color
+      description: Color of the time left until the reset.
+      selector:
+        color_rgb: {}
+      default:
+      - 140
+      - 140
+      - 140
+    show_rainbow:
+      name: Rainbow Colors
+      description: Show the texts in Rainbow colors. The progress bar keeps its threshold
+        color.
+      selector:
+        boolean: {}
+      default: false
+    repeat:
+      name: Repeat
+      description: How many times a scrolling text runs through its box before the
+        app ends. 0 turns it off and the duration is used instead.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: '2'
+    duration:
+      name: Duration (in seconds)
+      description: Sets how long the app should be displayed. 0 is global app time.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: '0'
+    lifetime:
+      name: Lifetime (in seconds)
+      description: How long the app stays alive before it is removed from the app
+        cycle automatically. 0 is infinite lifetime.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: '0'
+    lifetime_expiry:
+      name: On lifetime expiry
+      description: What happens when the lifetime runs out. "Remove" drops the app
+        from the rotation, "Mark" keeps it and draws a dark red frame around it.
+      selector:
+        select:
+          options:
+          - label: Remove the app
+            value: remove
+          - label: Mark the app as stale
+            value: mark
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: remove
+    switch_to_app:
+      name: Switch to app on value change
+      description: Should the clock switch to the app immediately when the usage changes?
+      selector:
+        boolean: {}
+      default: false
+    scroll:
+      name: Scroll the text?
+      description: Enables scrolling of texts that don't fit.
+      selector:
+        boolean: {}
+      default: true
+    scroll_speed:
+      name: Scroll Speed Percentage
+      description: Modifies the scrollspeed. You need to enter a percentage value.
+      selector:
+        number:
+          mode: slider
+          min: 0.0
+          max: 200.0
+          step: 1.0
+      default: 100
+    effect:
+      name: Effect
+      description: Select a background effect (optional).
+      selector:
+        select:
+          options:
+          - label: None
+            value: ''
+          - label: BrickBreaker
+            value: BrickBreaker
+          - label: Checkerboard
+            value: Checkerboard
+          - label: ColorWaves
+            value: ColorWaves
+          - label: Fade
+            value: Fade
+          - label: Fireworks
+            value: Fireworks
+          - label: LookingEyes
+            value: LookingEyes
+          - label: Matrix
+            value: Matrix
+          - label: MovingLine
+            value: MovingLine
+          - label: PingPong
+            value: PingPong
+          - label: Pacifica
+            value: Pacifica
+          - label: Plasma
+            value: Plasma
+          - label: PlasmaCloud
+            value: PlasmaCloud
+          - label: Radar
+            value: Radar
+          - label: Ripple
+            value: Ripple
+          - label: Snake
+            value: Snake
+          - label: SwirlIn
+            value: SwirlIn
+          - label: SwirlOut
+            value: SwirlOut
+          - label: TheaterChase
+            value: TheaterChase
+          - label: TwinklingStars
+            value: TwinklingStars
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: ''
+    overlay:
+      name: Weather Overlay
+      description: Optional AWTRIX NG weather overlay drawn on top of the app. "Follow
+        device setting" leaves the global overlay in charge.
+      selector:
+        select:
+          options:
+          - label: Follow device setting
+            value: ''
+          - label: Drizzle
+            value: drizzle
+          - label: Frost
+            value: frost
+          - label: Rain
+            value: rain
+          - label: Snow
+            value: snow
+          - label: Storm
+            value: storm
+          - label: Thunder
+            value: thunder
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: ''
+mode: restart
+triggers:
+- trigger: homeassistant
+  event: start
+- trigger: state
+  entity_id: !input usage_sensor
+  for:
+    seconds: 5
+- trigger: time_pattern
+  id: tick
+  minutes: /1
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  v_sensor: !input usage_sensor
+  v_reset: !input reset_sensor
+  v_app: !input app_name
+  v_label: !input label_text
+  v_language: !input language
+  v_warn: !input threshold_warn
+  v_high: !input threshold_high
+  v_icon_id: !input icon_id
+  v_text_case: !input text_case
+  v_background_color: !input background_color
+  v_label_color: !input label_color
+  v_text_color: !input text_color
+  v_reset_color: !input reset_color
+  v_show_rainbow: !input show_rainbow
+  v_repeat: !input repeat
+  v_duration: !input duration
+  v_lifetime: !input lifetime
+  v_lifetime_expiry: !input lifetime_expiry
+  v_switch: !input switch_to_app
+  v_scroll: !input scroll
+  v_scroll_speed: !input scroll_speed
+  v_effect: !input effect
+  v_overlay: !input overlay
+  targets: "{% set ns = namespace(t=[]) %} {% for device_id in device_ids %}\n  {%
+    set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list
+    %}\n  {% if found %}\n    {% set ns.t = ns.t + [states(found[0])] %}\n  {% endif
+    %}\n{% endfor %} {% set ns.t = ns.t + (extra_prefixes | list) %} {{ ns.t | map('trim')
+    | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}"
+conditions:
+- condition: template
+  value_template: '{{ trigger is not defined or trigger.id != ''tick'' or (v_reset
+    | default('''', true) | string | trim) != '''' }}'
+actions:
+- variables:
+    usage: '{{ states(v_sensor) | float(-1) | round(0) | int }}'
+    ok: '{{ usage >= 0 }}'
+    usage_color: "{{ [255, 0, 0] if usage > v_high | int\n   else ([255, 222, 33]
+      if usage > v_warn | int else v_text_color) }}"
+    time_left: "{% set r = v_reset | default('', true) | string | trim %} {% set ts
+      = as_timestamp(states(r), none) if r else none %} {% if ts is none %} {% else
+      %}\n  {% set units = {\n    'en': ['d', 'h'], 'dk': ['d', 't'], 'nl': ['d',
+      'u'], 'de': ['T', 'h'],\n    'fr': ['j', 'h'], 'es': ['d', 'h'], 'it': ['g',
+      'h'], 'pl': ['d', 'h'],\n    'pt': ['d', 'h'], 'ru': ['д', 'ч']\n  }.get(v_language,
+      ['d', 'h']) %}\n  {% set s = [ts - as_timestamp(now()), 0] | max | int %}\n
+      \ {% set d = s // 86400 %}\n  {% set h = (s % 86400) // 3600 %}\n  {% set m
+      = (s % 3600) // 60 %}\n  {% if d > 0 %}{{ d ~ units[0] ~ ' ' ~ h ~ units[1]
+      }}{% else %}{{ h ~ ':' ~ '%02d' | format(m) }}{% endif %}\n{% endif %}"
+    app_payload: "{% set na_by_lang = {\n  'en': 'N/A', 'dk': 'Ikke tilgængelig',
+      'nl': 'N.v.t.',\n  'de': 'Nicht verfügbar', 'fr': 'N/D', 'es': 'N/D',\n  'it':
+      'N/D', 'pl': 'Brak danych', 'pt': 'N/D', 'ru': 'Нет данных'\n} %} {% set icon
+      = v_icon_id | default('', true) | string | trim %} {% set x0 = 18 if icon else
+      0 %} {% set w = 52 - x0 %} {% set label = v_label | default('', true) | string
+      | trim %} {% set left = time_left | trim %} {% set scroll = {'mode': 'loop',
+      'gap': 12, 'speed': v_scroll_speed | int(100)}\n                if v_scroll
+      else 'static' %}\n{% if ok %}\n  {% set parts = [{'text': usage ~ '%', 'color':
+      usage_color}] %}\n  {% if left %}\n    {% set parts = parts + [{'text': '  '
+      ~ left, 'color': v_reset_color}] %}\n  {% endif %}\n{% else %}\n  {% set parts
+      = [{'text': na_by_lang.get(v_language, na_by_lang['en']), 'color': v_text_color}]
+      %}\n{% endif %} {% set rainbow = {'textColor': 'palette', 'palette': 'Rainbow'}
+      %} {% set ns = namespace(r=[]) %} {% if icon %}\n  {% set ns.r = ns.r + [{'id':
+      'icon', 'box': [0, 0, 16, 16], 'icon': icon}] %}\n{% endif %} {% if label %}\n
+      \ {% set ns.r = ns.r + [\n    dict({'id': 'label', 'box': [x0, 0, w, 7], 'text':
+      label, 'scroll': scroll,\n          'textCase': v_text_case},\n         **(rainbow
+      if v_show_rainbow else {'color': v_label_color})),\n    dict({'id': 'value',
+      'box': [x0, 7, w, 7], 'text': parts, 'scroll': scroll,\n          'textCase':
+      v_text_case}, **(rainbow if v_show_rainbow else {}))\n  ] %}\n{% else %}\n  {%
+      set ns.r = ns.r + [\n    dict({'id': 'value', 'box': [x0, 0, w, 14], 'text':
+      parts, 'scroll': scroll,\n          'textCase': v_text_case}, **(rainbow if
+      v_show_rainbow else {}))\n  ] %}\n{% endif %} {% set ns.r = ns.r + [{'id': 'progress',
+      'box': [x0, 14, w, 2],\n                       'progress': usage if ok else
+      0,\n                       'color': usage_color, 'trackColor': [40, 40, 40]}]
+      %}\n{% set layout = {'version': 1, 'regions': ns.r} %} {% if v_effect %}\n  {%
+      set layout = dict(layout, effect=v_effect) %}\n{% else %}\n  {% set layout =
+      dict(layout, backgroundColor=v_background_color) %}\n{% endif %} {% if v_overlay
+      %}\n  {% set layout = dict(layout, overlay=v_overlay) %}\n{% endif %} {{ {\n
+      \    'repeat': v_repeat | int(0),\n     'durationMs': (v_duration | int(0))
+      * 1000,\n     'lifetimeMs': (v_lifetime | int(0)) * 1000,\n     'lifetimeExpiry':
+      v_lifetime_expiry,\n     'layout': layout\n   } | tojson }}"
+- repeat:
+    for_each: '{{ targets }}'
+    sequence:
+    - action: mqtt.publish
+      data:
+        qos: 0
+        retain: false
+        evaluate_payload: false
+        topic: '{{ repeat.item ~ ''/cmd/apps/pushed/'' ~ v_app }}'
+        payload: '{{ app_payload }}'
+    - condition: template
+      value_template: '{{ v_switch == true and (trigger is not defined or trigger.id
+        != ''tick'') }}'
+    - action: mqtt.publish
+      data:
+        qos: 0
+        retain: false
+        topic: '{{ repeat.item ~ ''/cmd/apps/switch'' }}'
+        payload: '{{ v_app }}'
