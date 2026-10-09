@@ -2,11 +2,10 @@ blueprint:
   name: AWTRIX NG Rain Forecast TC002 (52×16)
   description: 'Shows an hourly rain forecast on one or more AWTRIX NG displays with
     a 52×16 panel (Ulanzi TC002), and refreshes it automatically whenever the forecast
-    changes. Uses an AWTRIX NG layout: a 16×16 weather icon on the left, the expected
-    total rain (mm) on the top line and a bar or line chart of the coming hours below
-    it. When no rain is expected it shows a text instead. The icons are read from the
-    clock, named after the weather state (e.g. rainy, cloudy). Built for the AWTRIX
-    NG MQTT API. V1.1'
+    changes. Uses an AWTRIX NG layout: a 16×16 rain icon stored on the clock on the
+    left, the expected total rain (mm) on the top line and a bar or line chart of
+    the coming hours below it. When no rain is expected it shows a text instead. Built
+    for the AWTRIX NG MQTT API. V1.2'
   domain: automation
   author: Leon
   homeassistant:
@@ -135,33 +134,16 @@ blueprint:
           step: 0.5
           unit_of_measurement: mm
       default: 5
-    icon_source:
-      name: Icon source
-      description: '"Icons on the clock" uses 16×16 icons stored on the clock, named
-        <prefix><weather state> (e.g. rainy, partlycloudy, clear-night). Careful: if
-        such an icon is missing, AWTRIX NG refuses the whole update. "No icon" lets
-        the text and chart use the full width.'
-      selector:
-        select:
-          options:
-          - label: Icons on the clock
-            value: clock
-          - label: No icon
-            value: none
-          mode: dropdown
-          multiple: false
-          custom_value: false
-          sort: false
-      default: clock
-    icon_prefix:
-      name: Icon name prefix
-      description: Only for "Icons on the clock". Put in front of the weather state
-        to form the icon ID, e.g. "wx_" gives wx_rainy.
+    icon_id:
+      name: Icon ID on the clock
+      description: ID of a 16×16 rain icon stored on the clock (the file name without
+        extension). AWTRIX NG refuses the whole update when the icon is missing. Leave
+        empty for no icon; the text and chart then use the full width.
       selector:
         text:
           multiline: false
           multiple: false
-      default: ''
+      default: rainy
     graph_color:
       name: Graph Color
       description: Select the Graph color.
@@ -373,8 +355,7 @@ variables:
   show_total: !input show_total
   autoscale: !input autoscale
   chart_max: !input chart_max
-  icon_source: !input icon_source
-  icon_prefix: !input icon_prefix
+  icon_id: !input icon_id
   graph_color: !input graph_color
   text_color: !input text_color
   background_color: !input background_color
@@ -423,10 +404,8 @@ actions:
       pioggia prevista', 'pl': 'Brak opadów deszczu',\n  'pt': 'Sem previsão de chuva',
       'ru': 'Дождь не ожидается'\n} %} {{ my_custom_text if my_custom_text | trim
       != '' else\n   no_rain_by_lang.get(v_language, no_rain_by_lang['en']) }}"
-    icon_value: "{% set s = states(my_sensor) %} {% if icon_source == 'clock' %}\n  {{ (icon_prefix | default('', true)
-      | trim) ~ s }}\n{% endif %}"
     app_payload: "{% set data = rain_tenths | from_json if rain_tenths is string else
-      rain_tenths %} {% set icon = icon_value | trim %} {% set x0 = 18 if icon else
+      rain_tenths %} {% set icon = icon_id | default('', true) | string | trim %} {% set x0 = 18 if icon else
       0 %} {% set w = 52 - x0 %} {% set scroll = {'mode': 'loop', 'gap': 12, 'speed':
       scroll_speed | int(100)}\n                if scrolling else 'static' %}\n{%
       set c_text = {'textColor': 'palette', 'palette': 'Rainbow'} if show_rainbow\n
