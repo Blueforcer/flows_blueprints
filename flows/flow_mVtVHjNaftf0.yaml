@@ -1,0 +1,499 @@
+blueprint:
+  name: AWTRIX NG Moon Phase TC002 (52×16)
+  description: >-
+    Displays the current moon phase on one or more AWTRIX NG displays with a
+    52×16 panel (Ulanzi TC002). Uses an AWTRIX NG layout: the moon phase icon
+    on the left and the phase name split over two lines (first word on top, the
+    rest below; single-word names use the full height). Uses the built-in Home
+    Assistant "Moon" integration as its source. The icons must be on the clock,
+    named after the phase (new_moon, waxing_crescent, first_quarter,
+    waxing_gibbous, full_moon, waning_gibbous, last_quarter, waning_crescent),
+    optionally with a prefix. Available languages: Dutch, English, German, or
+    your own text per phase ("Custom"). Built for the AWTRIX NG MQTT API. V2.0
+  domain: automation
+  author: LeonCB
+  homeassistant:
+    min_version: 2025.2.0
+  input:
+    awtrix_displays:
+      name: AWTRIX Displays
+      description: >-
+        Select the target AWTRIX NG TC002 displays. Needs HA discovery enabled
+        on each device - the blueprint reads its MQTT prefix from the "MQTT
+        prefix" sensor.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+          multiple: true
+      default: []
+    extra_prefixes:
+      name: Extra MQTT prefixes
+      description: >-
+        Optional. MQTT topic prefixes of displays that are not in Home
+        Assistant - the mqttPrefix from their MQTT settings, or the
+        12-character device uid when that field is empty.
+      selector:
+        text:
+          multiple: true
+          multiline: false
+      default: []
+    moon_sensor:
+      name: Moon Phase Sensor
+      description: >-
+        The entity from Home Assistant's "Moon" integration (e.g. sensor.moon
+        or sensor.moon_phase).
+      selector:
+        entity:
+          filter:
+            - domain:
+                - sensor
+          multiple: false
+    app_name:
+      name: AWTRIX Application name
+      description: >-
+        The app name used in the MQTT topic - it should be unique and match
+        [A-Za-z0-9_-]{1,32}
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: moonphase
+
+    language:
+      name: Language
+      description: >-
+        Language used for the moon phase text. Choose "Custom" to use your own
+        translations from the Custom Text fields below.
+      selector:
+        select:
+          options:
+            - label: "Dutch"
+              value: "nl"
+            - label: "English"
+              value: "en"
+            - label: "German"
+              value: "de"
+            - label: "Custom (use my own text below)"
+              value: "custom"
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: en
+    custom_new_moon:
+      name: "Custom text: New moon"
+      description: Only used when Language is set to "Custom". Empty falls back to English.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: ''
+    custom_waxing_crescent:
+      name: "Custom text: Waxing crescent"
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: ''
+    custom_first_quarter:
+      name: "Custom text: First quarter"
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: ''
+    custom_waxing_gibbous:
+      name: "Custom text: Waxing gibbous"
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: ''
+    custom_full_moon:
+      name: "Custom text: Full moon"
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: ''
+    custom_waning_gibbous:
+      name: "Custom text: Waning gibbous"
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: ''
+    custom_last_quarter:
+      name: "Custom text: Last quarter"
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: ''
+    custom_waning_crescent:
+      name: "Custom text: Waning crescent"
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: ''
+
+    icon_prefix:
+      name: Icon name prefix
+      description: >-
+        The icon ID is this prefix followed by the phase, e.g. "" gives
+        full_moon and "moon_" gives moon_full_moon. If an icon is missing on
+        the clock, AWTRIX NG refuses the whole update.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: ''
+    show_icon:
+      name: Show icon
+      description: Show the moon phase icon on the left.
+      selector:
+        boolean: {}
+      default: true
+    text_case:
+      name: Text Case
+      description: Select how you would like your text to display.
+      selector:
+        select:
+          options:
+            - label: Use global setting
+              value: inherit
+            - label: Force Uppercase
+              value: upper
+            - label: Show as you entered it
+              value: asTyped
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: inherit
+    background_color:
+      name: Background Color
+      description: Select the Background color. Ignored when an effect is chosen.
+      selector:
+        color_rgb: {}
+      default: [0, 0, 0]
+    text_color:
+      name: Text Color
+      description: Color of the phase name.
+      selector:
+        color_rgb: {}
+      default: [170, 170, 255]
+    show_rainbow:
+      name: Rainbow Colors
+      description: Should the text be shown in Rainbow colors?
+      selector:
+        boolean: {}
+      default: false
+    repeat:
+      name: Repeat
+      description: >-
+        How many times a scrolling text runs through its box before the app
+        ends. 0 turns it off and the duration is used instead.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: '2'
+    duration:
+      name: Duration (in seconds)
+      description: Sets how long the app should be displayed. 0 is global app time.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: '0'
+    lifetime:
+      name: Lifetime (in seconds)
+      description: >-
+        How long the app stays alive before it is removed from the app cycle
+        automatically. 0 is infinite lifetime.
+      selector:
+        text:
+          multiline: false
+          multiple: false
+      default: '0'
+    lifetime_expiry:
+      name: On lifetime expiry
+      description: >-
+        What happens when the lifetime runs out. "Remove" drops the app from
+        the rotation, "Mark" keeps it and draws a dark red frame around it.
+      selector:
+        select:
+          options:
+            - label: Remove the app
+              value: remove
+            - label: Mark the app as stale
+              value: mark
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: remove
+    switch_to_app:
+      name: Switch to app when the phase changes
+      description: Should the clock switch to the app immediately when the phase changes?
+      selector:
+        boolean: {}
+      default: false
+    scroll:
+      name: Scroll the text?
+      description: Enables scrolling of words that don't fit.
+      selector:
+        boolean: {}
+      default: true
+    scrollspeed:
+      name: Scroll Speed Percentage
+      description: Modifies the scrollspeed. You need to enter a percentage value.
+      selector:
+        number:
+          mode: slider
+          min: 0.0
+          max: 200.0
+          step: 1.0
+      default: 100
+    effect:
+      name: Effect
+      description: Select a background effect (optional).
+      selector:
+        select:
+          options:
+            - label: None
+              value: ''
+            - label: BrickBreaker
+              value: BrickBreaker
+            - label: Checkerboard
+              value: Checkerboard
+            - label: ColorWaves
+              value: ColorWaves
+            - label: Fade
+              value: Fade
+            - label: Fireworks
+              value: Fireworks
+            - label: LookingEyes
+              value: LookingEyes
+            - label: Matrix
+              value: Matrix
+            - label: MovingLine
+              value: MovingLine
+            - label: PingPong
+              value: PingPong
+            - label: Pacifica
+              value: Pacifica
+            - label: Plasma
+              value: Plasma
+            - label: PlasmaCloud
+              value: PlasmaCloud
+            - label: Radar
+              value: Radar
+            - label: Ripple
+              value: Ripple
+            - label: Snake
+              value: Snake
+            - label: SwirlIn
+              value: SwirlIn
+            - label: SwirlOut
+              value: SwirlOut
+            - label: TheaterChase
+              value: TheaterChase
+            - label: TwinklingStars
+              value: TwinklingStars
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: ''
+    overlay:
+      name: Weather Overlay
+      description: >-
+        Optional AWTRIX NG weather overlay drawn on top of the app. "Follow
+        device setting" leaves the global overlay in charge.
+      selector:
+        select:
+          options:
+            - label: Follow device setting
+              value: ''
+            - label: Drizzle
+              value: drizzle
+            - label: Frost
+              value: frost
+            - label: Rain
+              value: rain
+            - label: Snow
+              value: snow
+            - label: Storm
+              value: storm
+            - label: Thunder
+              value: thunder
+          mode: dropdown
+          multiple: false
+          custom_value: false
+          sort: false
+      default: ''
+
+mode: restart
+
+triggers:
+  - trigger: homeassistant
+    event: start
+  - trigger: state
+    id: phase
+    entity_id: !input moon_sensor
+    for:
+      seconds: 5
+
+variables:
+  device_ids: !input awtrix_displays
+  extra_prefixes: !input extra_prefixes
+  v_sensor: !input moon_sensor
+  v_app: !input app_name
+  v_language: !input language
+  v_icon_prefix: !input icon_prefix
+  v_show_icon: !input show_icon
+  v_text_case: !input text_case
+  v_background_color: !input background_color
+  v_text_color: !input text_color
+  v_show_rainbow: !input show_rainbow
+  v_repeat: !input repeat
+  v_duration: !input duration
+  v_lifetime: !input lifetime
+  v_lifetime_expiry: !input lifetime_expiry
+  v_switch: !input switch_to_app
+  v_scroll: !input scroll
+  v_scrollspeed: !input scrollspeed
+  v_effect: !input effect
+  v_overlay: !input overlay
+  targets: >-
+    {% set ns = namespace(t=[]) %}
+    {% for device_id in device_ids %}
+      {% set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list %}
+      {% if found %}
+        {% set ns.t = ns.t + [states(found[0])] %}
+      {% endif %}
+    {% endfor %}
+    {% set ns.t = ns.t + (extra_prefixes | list) %}
+    {{ ns.t | map('trim') | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}
+  labels_by_lang:
+    en:
+      new_moon: New moon
+      waxing_crescent: Waxing crescent
+      first_quarter: First quarter
+      waxing_gibbous: Waxing gibbous
+      full_moon: Full moon
+      waning_gibbous: Waning gibbous
+      last_quarter: Last quarter
+      waning_crescent: Waning crescent
+    nl:
+      new_moon: Nieuwe maan
+      waxing_crescent: Wassende sikkel
+      first_quarter: Eerste kwartier
+      waxing_gibbous: Wassende maan
+      full_moon: Volle maan
+      waning_gibbous: Afnemende maan
+      last_quarter: Laatste kwartier
+      waning_crescent: Afnemende sikkel
+    de:
+      new_moon: Neumond
+      waxing_crescent: Zunehmende Sichel
+      first_quarter: Erstes Viertel
+      waxing_gibbous: Zunehmender Mond
+      full_moon: Vollmond
+      waning_gibbous: Abnehmender Mond
+      last_quarter: Letztes Viertel
+      waning_crescent: Abnehmende Sichel
+    custom:
+      new_moon: !input custom_new_moon
+      waxing_crescent: !input custom_waxing_crescent
+      first_quarter: !input custom_first_quarter
+      waxing_gibbous: !input custom_waxing_gibbous
+      full_moon: !input custom_full_moon
+      waning_gibbous: !input custom_waning_gibbous
+      last_quarter: !input custom_last_quarter
+      waning_crescent: !input custom_waning_crescent
+
+conditions:
+  - condition: not
+    conditions:
+      - condition: state
+        entity_id: !input moon_sensor
+        state:
+          - unavailable
+          - unknown
+
+actions:
+  - variables:
+      phase: "{{ states(v_sensor) }}"
+      labels: "{{ labels_by_lang.get(v_language, labels_by_lang['en']) }}"
+      app_payload: >-
+        {%- set label = labels.get(phase, '') | string | trim -%}
+        {%- if not label -%}
+          {%- set label = labels_by_lang['en'].get(phase, phase) | string | trim -%}
+        {%- endif -%}
+        {%- set words = label.split(' ') | reject('eq', '') | list -%}
+        {%- set line1 = words[0] if words else '' -%}
+        {%- set line2 = words[1:] | join(' ') -%}
+        {%- set icon = ((v_icon_prefix | default('', true) | trim) ~ phase) if v_show_icon else '' -%}
+        {%- set x0 = 18 if icon else 0 -%}
+        {%- set w = 52 - x0 -%}
+        {%- set scroll = {'mode': 'loop', 'gap': 12, 'speed': v_scrollspeed | int(100)}
+                         if v_scroll else 'static' -%}
+        {%- set style = {'textColor': 'palette', 'palette': 'Rainbow'} if v_show_rainbow
+                        else {'color': v_text_color} -%}
+        {%- set ns = namespace(r=[]) -%}
+        {%- if icon -%}
+          {%- set ns.r = ns.r + [{'id': 'icon', 'box': [0, 0, 16, 16], 'icon': icon}] -%}
+        {%- endif -%}
+        {%- if line2 -%}
+          {%- set ns.r = ns.r + [
+            dict({'id': 'line1', 'box': [x0, 0, w, 8], 'text': line1, 'scroll': scroll,
+                  'textCase': v_text_case}, **style),
+            dict({'id': 'line2', 'box': [x0, 8, w, 8], 'text': line2, 'scroll': scroll,
+                  'textCase': v_text_case}, **style)
+          ] -%}
+        {%- else -%}
+          {%- set ns.r = ns.r + [
+            dict({'id': 'line1', 'box': [x0, 0, w, 16], 'text': line1, 'scroll': scroll,
+                  'textCase': v_text_case}, **style)
+          ] -%}
+        {%- endif -%}
+        {%- set layout = {'version': 1, 'regions': ns.r} -%}
+        {%- if v_effect -%}
+          {%- set layout = dict(layout, effect=v_effect) -%}
+        {%- else -%}
+          {%- set layout = dict(layout, backgroundColor=v_background_color) -%}
+        {%- endif -%}
+        {%- if v_overlay -%}
+          {%- set layout = dict(layout, overlay=v_overlay) -%}
+        {%- endif -%}
+        {{ {
+             'repeat': v_repeat | int(0),
+             'durationMs': (v_duration | int(0)) * 1000,
+             'lifetimeMs': (v_lifetime | int(0)) * 1000,
+             'lifetimeExpiry': v_lifetime_expiry,
+             'layout': layout
+           } | tojson }}
+  - repeat:
+      for_each: "{{ targets }}"
+      sequence:
+        - action: mqtt.publish
+          data:
+            qos: 0
+            retain: false
+            evaluate_payload: false
+            topic: "{{ repeat.item ~ '/cmd/apps/pushed/' ~ v_app }}"
+            payload: "{{ app_payload }}"
+        - condition: template
+          value_template: "{{ v_switch == true and trigger is defined and trigger.id == 'phase' }}"
+        - action: mqtt.publish
+          data:
+            qos: 0
+            retain: false
+            topic: "{{ repeat.item ~ '/cmd/apps/switch' }}"
+            payload: "{{ v_app }}"
