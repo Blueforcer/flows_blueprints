@@ -1,13 +1,15 @@
 blueprint:
   name: AWTRIX NG Rain Forecast TC002 (52×16)
-  description: 'Shows an hourly rain forecast on one or more AWTRIX NG displays with
-    a 52×16 panel (Ulanzi TC002), and refreshes it automatically whenever the forecast
+  description: >-
+    Shows an hourly rain forecast on one or more AWTRIX NG displays with a 52×16
+    panel (Ulanzi TC002), and refreshes it automatically whenever the forecast
     changes. Uses an AWTRIX NG layout: a 16×16 rain icon stored on the clock on the
     left, the expected total rain (mm) on the top line and a bar or line chart of
-    the coming hours below it. When no rain is expected it shows a text instead. Built
-    for the AWTRIX NG MQTT API. V1.2'
+    the coming hours below it. When no rain is expected the app is removed from the
+    rotation, or optionally shows a "no rain expected" message instead. Built for
+    the AWTRIX NG MQTT API. V1.5
   domain: automation
-  author: Leon
+  author: LeonCB
   homeassistant:
     min_version: 2025.2.0
   input:
@@ -54,9 +56,19 @@ blueprint:
           max: 34.0
           step: 1.0
       default: 12
+    show_no_rain:
+      name: Show "no rain expected" message
+      description: When on, the app shows a "no rain expected" message when no rain
+        is expected in the chosen hours. When off, the app is removed from the clock
+        until rain shows up in the forecast again.
+      selector:
+        boolean: {}
+      default: false
     language:
       name: Language
-      description: Language used for the "no rain expected" text.
+      description: Language of the "no rain expected" text. Choose "Custom text" to
+        enter your own text below. Only used when "Show "no rain expected" message"
+        is on.
       selector:
         select:
           options:
@@ -80,6 +92,8 @@ blueprint:
             value: ru
           - label: Spanish
             value: es
+          - label: Custom text
+            value: custom
           mode: dropdown
           multiple: false
           custom_value: false
@@ -87,8 +101,8 @@ blueprint:
       default: en
     my_text:
       name: Custom Text
-      description: Optional. Overrides the translated "no rain expected" text. Leave
-        empty to use the text for the selected Language.
+      description: Your own "no rain expected" text. Only used when Language is set
+        to "Custom text"; falls back to English when left empty.
       selector:
         text:
           multiline: false
@@ -239,7 +253,7 @@ blueprint:
     switch_to_app:
       name: Switch to app on value change
       description: Should the clock switch to the app immediately when the forecast
-        changes?
+        changes? Never happens while the app is removed.
       selector:
         boolean: {}
       default: false
@@ -336,7 +350,9 @@ blueprint:
           custom_value: false
           sort: false
       default: ''
+
 mode: queued
+
 triggers:
 - trigger: homeassistant
   event: start
@@ -344,11 +360,13 @@ triggers:
   entity_id: !input my_sensor
   for:
     seconds: 2
+
 variables:
   device_ids: !input awtrix_displays
   extra_prefixes: !input extra_prefixes
   my_sensor: !input my_sensor
   hours: !input hours
+  show_no_rain: !input show_no_rain
   v_language: !input language
   my_custom_text: !input my_text
   graph_type: !input graph_type
@@ -371,11 +389,17 @@ variables:
   effect: !input effect
   overlay: !input overlay
   app_name: rain_forecast
-  targets: "{% set ns = namespace(t=[]) %} {% for device_id in device_ids %}\n  {%
-    set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list
-    %}\n  {% if found %}\n    {% set ns.t = ns.t + [states(found[0])] %}\n  {% endif
-    %}\n{% endfor %} {% set ns.t = ns.t + (extra_prefixes | list) %} {{ ns.t | map('trim')
-    | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}"
+  targets: >-
+    {% set ns = namespace(t=[]) %}
+    {% for device_id in device_ids %}
+      {% set found = device_entities(device_id) | select('search', 'mqtt_prefix') | list %}
+      {% if found %}
+        {% set ns.t = ns.t + [states(found[0])] %}
+      {% endif %}
+    {% endfor %}
+    {% set ns.t = ns.t + (extra_prefixes | list) %}
+    {{ ns.t | map('trim') | reject('in', ['', 'unknown', 'unavailable']) | unique | list }}
+
 conditions:
 - condition: not
   conditions:
@@ -384,6 +408,7 @@ conditions:
     state:
     - unavailable
     - unknown
+
 actions:
 - action: weather.get_forecasts
   data:
@@ -392,60 +417,115 @@ actions:
   target:
     entity_id: !input my_sensor
   continue_on_error: true
+
 - variables:
-    rain_tenths: "{% set f = (my_forecast[my_sensor].forecast\n            if my_forecast
-      is defined and my_sensor in my_forecast\n            else state_attr(my_sensor,
-      'forecast')) or [] %}\n{{ f[:hours | int(12)] | map(attribute='precipitation')\n
-      \  | map('float', 0) | map('multiply', 10) | map('round', 0) | map('int') |
-      list }}"
-    no_rain_text: "{% set no_rain_by_lang = {\n  'en': 'No rain expected', 'dk': 'Ingen
-      regn forventet',\n  'nl': 'Geen regen verwacht', 'de': 'Kein Regen erwartet',\n
-      \ 'fr': 'Pas de pluie prévue', 'es': 'No se espera lluvia',\n  'it': 'Nessuna
-      pioggia prevista', 'pl': 'Brak opadów deszczu',\n  'pt': 'Sem previsão de chuva',
-      'ru': 'Дождь не ожидается'\n} %} {{ my_custom_text if my_custom_text | trim
-      != '' else\n   no_rain_by_lang.get(v_language, no_rain_by_lang['en']) }}"
-    app_payload: "{% set data = rain_tenths | from_json if rain_tenths is string else
-      rain_tenths %} {% set icon = icon_id | default('', true) | string | trim %} {% set x0 = 18 if icon else
-      0 %} {% set w = 52 - x0 %} {% set scroll = {'mode': 'loop', 'gap': 12, 'speed':
-      scroll_speed | int(100)}\n                if scrolling else 'static' %}\n{%
-      set c_text = {'textColor': 'palette', 'palette': 'Rainbow'} if show_rainbow\n
-      \               else {'color': text_color} %}\n{% set c_chart = {'color': 'palette',
-      'palette': 'Rainbow'} if show_rainbow\n                 else {'color': graph_color}
-      %}\n{% set ns = namespace(r=[]) %} {% if icon %}\n  {% set ns.r = ns.r + [{'id':
-      'icon', 'box': [0, 0, 16, 16], 'icon': icon}] %}\n{% endif %} {% if (data |
-      sum) > 0 %}\n  {% set chart = {'values': data, 'type': graph_type} %}\n  {%
-      if not autoscale %}\n    {% set chart = dict(chart, min=0, max=[(chart_max |
-      float(5) * 10) | round(0) | int, 1] | max) %}\n  {% endif %}\n  {% if show_total
-      %}\n    {% set total = '%.1f' | format((data | sum) / 10) ~ ' mm' %}\n    {%
-      set ns.r = ns.r + [\n      dict({'id': 'total', 'box': [x0, 0, w, 7], 'text':
-      total,\n            'scroll': scroll, 'textCase': 'asTyped'}, **c_text),\n      dict({'id':
-      'chart', 'box': [x0, 7, w, 9], 'chart': chart}, **c_chart)\n    ] %}\n  {% else
-      %}\n    {% set ns.r = ns.r + [\n      dict({'id': 'chart', 'box': [x0, 0, w,
-      16], 'chart': chart}, **c_chart)\n    ] %}\n  {% endif %}\n{% else %}\n  {%
-      set ns.r = ns.r + [\n    dict({'id': 'norain', 'box': [x0, 0, w, 16], 'text':
-      no_rain_text | trim,\n          'scroll': scroll, 'textCase': text_case}, **c_text)\n
-      \ ] %}\n{% endif %} {% set layout = {'version': 1, 'regions': ns.r} %} {% if
-      effect %}\n  {% set layout = dict(layout, effect=effect) %}\n{% else %}\n  {%
-      set layout = dict(layout, backgroundColor=background_color) %}\n{% endif %}
-      {% if overlay %}\n  {% set layout = dict(layout, overlay=overlay) %}\n{% endif
-      %} {{ {\n     'repeat': my_repeat | int(0),\n     'durationMs': (my_duration
-      | int(0)) * 1000,\n     'lifetimeMs': (my_lifetime | int(0)) * 1000,\n     'lifetimeExpiry':
-      lifetime_expiry,\n     'layout': layout\n   } | tojson }}"
+    rain_tenths: >-
+      {% set f = (my_forecast[my_sensor].forecast
+                  if my_forecast is defined and my_sensor in my_forecast
+                  else state_attr(my_sensor, 'forecast')) or [] %}
+      {{ f[:hours | int(12)] | map(attribute='precipitation')
+         | map('float', 0) | map('multiply', 10) | map('round', 0) | map('int') | list }}
+    has_rain: >-
+      {% set data = rain_tenths | from_json if rain_tenths is string else rain_tenths %}
+      {{ (data | sum) > 0 }}
+    no_rain_text: >-
+      {% set no_rain_by_lang = {
+        'en': 'No rain expected', 'dk': 'Ingen regn forventet',
+        'nl': 'Geen regen verwacht', 'de': 'Kein Regen erwartet',
+        'fr': 'Pas de pluie prévue', 'es': 'No se espera lluvia',
+        'it': 'Nessuna pioggia prevista', 'pl': 'Brak opadów deszczu',
+        'pt': 'Sem previsão de chuva', 'ru': 'Дождь не ожидается'
+      } %}
+      {% if v_language == 'custom' and my_custom_text | trim != '' %}
+        {{ my_custom_text | trim }}
+      {% else %}
+        {{ no_rain_by_lang.get(v_language, no_rain_by_lang['en']) }}
+      {% endif %}
+    app_payload: >-
+      {% set data = rain_tenths | from_json if rain_tenths is string else rain_tenths %}
+      {% set icon = icon_id | default('', true) | string | trim %}
+      {% set x0 = 18 if icon else 0 %}
+      {% set w = 52 - x0 %}
+      {% set scroll = {'mode': 'loop', 'gap': 12, 'speed': scroll_speed | int(100)}
+                      if scrolling else 'static' %}
+      {% set c_text = {'textColor': 'palette', 'palette': 'Rainbow'} if show_rainbow
+                      else {'color': text_color} %}
+      {% set c_chart = {'color': 'palette', 'palette': 'Rainbow'} if show_rainbow
+                       else {'color': graph_color} %}
+      {% set ns = namespace(r=[]) %}
+      {% if icon %}
+        {% set ns.r = ns.r + [{'id': 'icon', 'box': [0, 0, 16, 16], 'icon': icon}] %}
+      {% endif %}
+      {% if (data | sum) > 0 %}
+        {% set chart = {'values': data, 'type': graph_type} %}
+        {% if not autoscale %}
+          {% set chart = dict(chart, min=0, max=[(chart_max | float(5) * 10) | round(0) | int, 1] | max) %}
+        {% endif %}
+        {% if show_total %}
+          {% set total = '%.1f' | format((data | sum) / 10) ~ ' mm' %}
+          {% set ns.r = ns.r + [
+            dict({'id': 'total', 'box': [x0, 0, w, 7], 'text': total,
+                  'scroll': scroll, 'textCase': 'asTyped'}, **c_text),
+            dict({'id': 'chart', 'box': [x0, 7, w, 9], 'chart': chart}, **c_chart)
+          ] %}
+        {% else %}
+          {% set ns.r = ns.r + [
+            dict({'id': 'chart', 'box': [x0, 0, w, 16], 'chart': chart}, **c_chart)
+          ] %}
+        {% endif %}
+      {% else %}
+        {% set ns.r = ns.r + [
+          dict({'id': 'norain', 'box': [x0, 0, w, 16], 'text': no_rain_text | trim,
+                'scroll': scroll, 'textCase': text_case}, **c_text)
+        ] %}
+      {% endif %}
+      {% set layout = {'version': 1, 'regions': ns.r} %}
+      {% if effect %}
+        {% set layout = dict(layout, effect=effect) %}
+      {% else %}
+        {% set layout = dict(layout, backgroundColor=background_color) %}
+      {% endif %}
+      {% if overlay %}
+        {% set layout = dict(layout, overlay=overlay) %}
+      {% endif %}
+      {{ {
+           'repeat': my_repeat | int(0),
+           'durationMs': (my_duration | int(0)) * 1000,
+           'lifetimeMs': (my_lifetime | int(0)) * 1000,
+           'lifetimeExpiry': lifetime_expiry,
+           'layout': layout
+         } | tojson }}
+
 - repeat:
     for_each: '{{ targets }}'
     sequence:
-    - action: mqtt.publish
-      data:
-        qos: 0
-        retain: false
-        evaluate_payload: false
-        topic: '{{ repeat.item ~ ''/cmd/apps/pushed/'' ~ app_name }}'
-        payload: '{{ app_payload }}'
-    - condition: template
-      value_template: '{{ switch_to_app == true }}'
-    - action: mqtt.publish
-      data:
-        qos: 0
-        retain: false
-        topic: '{{ repeat.item ~ ''/cmd/apps/switch'' }}'
-        payload: '{{ app_name }}'
+    - choose:
+      # No rain and message is off: remove the app from the rotation (empty payload)
+      - conditions:
+        - condition: template
+          value_template: '{{ not show_no_rain and not has_rain }}'
+        sequence:
+        - action: mqtt.publish
+          data:
+            qos: 0
+            retain: false
+            topic: '{{ repeat.item ~ ''/cmd/apps/pushed/'' ~ app_name }}'
+            payload: ''
+      default:
+      - action: mqtt.publish
+        data:
+          qos: 0
+          retain: false
+          evaluate_payload: false
+          topic: '{{ repeat.item ~ ''/cmd/apps/pushed/'' ~ app_name }}'
+          payload: '{{ app_payload }}'
+      - if:
+        - condition: template
+          value_template: '{{ switch_to_app == true }}'
+        then:
+        - action: mqtt.publish
+          data:
+            qos: 0
+            retain: false
+            topic: '{{ repeat.item ~ ''/cmd/apps/switch'' }}'
+            payload: '{{ app_name }}'
