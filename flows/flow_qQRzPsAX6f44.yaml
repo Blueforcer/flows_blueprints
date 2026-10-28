@@ -1,0 +1,145 @@
+blueprint:
+  name: CO2 Monitor (AWTRIX NG)
+  description: |
+    Displays the current CO2 concentration on an AWTRIX NG
+    display as the pushed app `co2`.
+
+    **Display**
+
+    | CO2 concentration | Icon | Color |
+    |---|---|---|
+    | below orange threshold | `co2-good` | green |
+    | at or above orange threshold | `co2-medium` | orange |
+    | at or above red threshold | `co2-bad` | red |
+
+    The displayed value is in ppm, without the unit.
+
+    **Setup**
+    1. AWTRIX NG with MQTT and Home Assistant discovery enabled.
+    2. Install the three CO2 icons from the AWTRIX Hub
+       (https://awtrix.de/icons). Search for `co2` and
+       send the following icons to AWTRIX:
+       `co2-good`, `co2-medium`, `co2-bad`.
+       The icon names must match exactly.
+    3. Set the app order once on the display
+       (app name: `co2`).
+
+    The app is updated on every sensor change and every
+    30 seconds, and disappears after 2 minutes without
+    an update.
+
+  domain: automation
+
+  input:
+    awtrix:
+      name: AWTRIX NG Device
+      description: AWTRIX NG display(s)
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+              manufacturer: Blueforcer
+          multiple: true
+
+    co2_sensor:
+      name: CO2 Sensor
+      description: CO2 concentration in ppm
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+
+    orange_threshold:
+      name: Orange Threshold (ppm)
+      default: 1000
+      selector:
+        number:
+          min: 400
+          max: 3000
+          step: 50
+          unit_of_measurement: ppm
+          mode: slider
+
+    red_threshold:
+      name: Red Threshold (ppm)
+      default: 1500
+      selector:
+        number:
+          min: 500
+          max: 5000
+          step: 50
+          unit_of_measurement: ppm
+          mode: slider
+
+mode: single
+
+variables:
+  device_ids: !input awtrix
+  co2_sensor: !input co2_sensor
+  orange_threshold: !input orange_threshold
+  red_threshold: !input red_threshold
+
+  devices_topics: >-
+    {%- macro get_device_topic(device_id) %}
+      {%- set e = device_entities(device_id)
+        | select('search', 'mqtt_prefix') | list %}
+      {{- states(e[0]) if e else 'unknown' }}
+    {%- endmacro %}
+    {%- set ns = namespace(devices=[]) %}
+    {%- for device_id in device_ids %}
+      {%- set device = get_device_topic(device_id)
+        | replace(' ', '') | trim %}
+      {%- if device not in ['unknown', 'unavailable', ''] %}
+        {%- set ns.devices = ns.devices
+          + [device ~ '/cmd/apps/pushed/co2'] %}
+      {%- endif %}
+    {%- endfor %}
+    {{ ns.devices }}
+
+  payload: >-
+    {%- set value = states(co2_sensor) | float(none) %}
+    {%- if value is none %}
+      {{ {
+        "icon": "co2-good",
+        "text": "--",
+        "textColor": "#FFFFFF",
+        "lifetimeMs": 120000
+      } | to_json }}
+    {%- else %}
+      {%- if value >= (red_threshold | float) %}
+        {%- set icon = "co2-bad" %}
+        {%- set color = "#FF0000" %}
+      {%- elif value >= (orange_threshold | float) %}
+        {%- set icon = "co2-medium" %}
+        {%- set color = "#FF9A1A" %}
+      {%- else %}
+        {%- set icon = "co2-good" %}
+        {%- set color = "#04FE04" %}
+      {%- endif %}
+      {{ {
+        "icon": icon,
+        "text": value | round(0) | int | string,
+        "textColor": color,
+        "lifetimeMs": 120000
+      } | to_json }}
+    {%- endif %}
+
+triggers:
+  - trigger: state
+    entity_id: !input co2_sensor
+
+  - trigger: time_pattern
+    seconds: /30
+
+conditions: []
+
+actions:
+  - repeat:
+      for_each: "{{ devices_topics }}"
+      sequence:
+        - action: mqtt.publish
+          data:
+            qos: 0
+            retain: false
+            topic: "{{ repeat.item }}"
+            payload: "{{ payload }}"
